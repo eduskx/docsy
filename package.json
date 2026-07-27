@@ -10,7 +10,8 @@
     "db:migrate": "node --env-file=.env scripts/migrate.ts",
     "db:ping": "node --env-file=.env scripts/ping.ts",
     "chunk:try": "node scripts/try-chunk.ts",
-    "embed:try": "node --env-file=.env scripts/try-embed.ts"
+    "embed:try": "node --env-file=.env scripts/try-embed.ts",
+    "ingest": "node --env-file=.env scripts/ingest.ts"
   },
   "dependencies": {
     "next": "16.2.11",
