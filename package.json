@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:migrate": "node --env-file=.env scripts/migrate.ts",
     "db:ping": "node --env-file=.env scripts/ping.ts",
-    "chunk:try": "node scripts/try-chunk.ts"
+    "chunk:try": "node scripts/try-chunk.ts",
+    "embed:try": "node --env-file=.env scripts/try-embed.ts"
   },
   "dependencies": {
     "next": "16.2.11",

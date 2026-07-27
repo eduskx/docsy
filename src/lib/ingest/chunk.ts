@@ -1,7 +1,7 @@
 /**
- * Kernstelle #1 — Chunking.  DAS SCHREIBST DU.
+ * Kernstelle #1 — Chunking.
  *
- * Dein Design (selbst hergeleitet):
+ * Design (selbst hergeleitet):
  *  - an Überschriften schneiden (structure-aware)
  *  - zu lange Sektionen zusätzlich nach Maximalgröße splitten (Fallback)
  *  - Größe in Tokens denken, per Zeichen annähern (~4 Zeichen ≈ 1 Token)
@@ -40,6 +40,12 @@ function estimateTokens(text: string): number {
 const MAX_TOKENS = 500;
 
 /**
+ * Wie viel Kontext (in Tokens) am Anfang eines Teilstücks vom Vorgänger
+ * wiederholt wird. ~15 % der Zielgröße — klein halten, sonst zu viele Duplikate.
+ */
+const OVERLAP_TOKENS = Math.round(MAX_TOKENS * 0.15);
+
+/**
  * Zerlegt Text an Satzgrenzen (Satzendezeichen + Leerraum dahinter).
  * Bewusst simpel — nicht perfekt bei Abkürzungen o.ä., aber für Doku gut genug.
  * Wird nur als Notfall-Ebene gebraucht, wenn ein einzelner Absatz zu groß ist.
@@ -73,6 +79,43 @@ function packUnits(units: string[], maxTokens: number, joiner: string): string[]
   if (current !== "") pieces.push(current);
 
   return pieces;
+}
+
+/**
+ * Nimmt die letzten Sätze eines Textes bis zu einem Token-Budget — der
+ * Kontext-"Schwanz", der am Anfang des nächsten Teilstücks wiederholt wird.
+ * Mindestens ein Satz, auch wenn er das Budget überschreitet.
+ */
+function takeTailSentences(text: string, budgetTokens: number): string {
+  const sentences = splitIntoSentences(text);
+  const tail: string[] = [];
+  let tokens = 0;
+
+  for (let i = sentences.length - 1; i >= 0; i--) {
+    const sentence = sentences[i];
+    const t = estimateTokens(sentence);
+    if (tail.length > 0 && tokens + t > budgetTokens) break;
+    tail.unshift(sentence);
+    tokens += t;
+  }
+
+  return tail.join(" ");
+}
+
+/**
+ * Legt Overlap zwischen benachbarte Teilstücke: jedes Stück (außer dem ersten)
+ * bekommt vorne den Kontext-Schwanz seines Vorgängers. Nur innerhalb einer
+ * gesplitteten Sektion — an Überschriften-Grenzen gibt es bewusst KEIN Overlap.
+ */
+function addOverlap(pieces: string[], overlapTokens: number): string[] {
+  if (pieces.length <= 1) return pieces;
+
+  const result = [pieces[0]];
+  for (let i = 1; i < pieces.length; i++) {
+    const tail = takeTailSentences(pieces[i - 1], overlapTokens);
+    result.push(tail === "" ? pieces[i] : tail + "\n\n" + pieces[i]);
+  }
+  return result;
 }
 
 /**
@@ -114,7 +157,8 @@ function splitBySize(text: string, maxTokens: number): string[] {
   }
   flushCurrent();
 
-  return pieces;
+  // Kontext an den Nahtstellen retten.
+  return addOverlap(pieces, OVERLAP_TOKENS);
 }
 
 export function chunk(markdown: string): Chunk[] {
@@ -174,7 +218,4 @@ export function chunk(markdown: string): Chunk[] {
   flush();
 
   return chunks;
-
-  // TODO(nächste Stufe):
-  //  - Overlap zwischen benachbarten Chunks (letzter Schliff)
 }
