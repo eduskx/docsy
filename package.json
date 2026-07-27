@@ -11,7 +11,8 @@
     "db:ping": "node --env-file=.env scripts/ping.ts",
     "chunk:try": "node scripts/try-chunk.ts",
     "embed:try": "node --env-file=.env scripts/try-embed.ts",
-    "ingest": "node --env-file=.env scripts/ingest.ts"
+    "ingest": "node --env-file=.env scripts/ingest.ts",
+    "search:try": "node --env-file=.env scripts/try-search.ts"
   },
   "dependencies": {
     "next": "16.2.11",
