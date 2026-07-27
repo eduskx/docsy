@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "node --env-file=.env scripts/migrate.ts",
-    "db:ping": "node --env-file=.env scripts/ping.ts"
+    "db:ping": "node --env-file=.env scripts/ping.ts",
+    "chunk:try": "node scripts/try-chunk.ts"
   },
   "dependencies": {
     "next": "16.2.11",
