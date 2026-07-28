@@ -1,0 +1,22 @@
+[
+  { "id": 1,  "question": "Wie fange ich Fehler in einem await-Aufruf ab?",                                  "source_path": "javascript/async-await.md",   "heading": "Fehlerbehandlung mit try/catch" },
+  { "id": 2,  "question": "Wie starte ich mehrere Netzwerkabfragen gleichzeitig?",                            "source_path": "javascript/async-await.md",   "heading": "Parallel statt seriell: Promise.all" },
+  { "id": 3,  "question": "Welche Zustände kann ein Promise annehmen?",                                       "source_path": "javascript/async-await.md",   "heading": "Promises" },
+  { "id": 4,  "question": "Warum war tief verschachtelter Code mit Rückruffunktionen so unübersichtlich?",   "source_path": "javascript/async-await.md",   "heading": "Das Problem: Callbacks" },
+  { "id": 5,  "question": "Wie deklariere ich eine Variable, die entweder Text oder eine Zahl sein darf?",   "source_path": "typescript/basic-types.md",   "heading": "Union- und Intersection-Typen" },
+  { "id": 6,  "question": "Wie schreibe ich eine wiederverwendbare Funktion, die mit beliebigen Typen arbeitet?", "source_path": "typescript/basic-types.md", "heading": "Generics" },
+  { "id": 7,  "question": "Wie beschreibe ich die Struktur eines Objekts mit festen Feldern?",               "source_path": "typescript/basic-types.md",   "heading": "Interfaces und Type Aliases" },
+  { "id": 8,  "question": "Wie grenzt TypeScript innerhalb eines if-Blocks den Typ ein?",                    "source_path": "typescript/basic-types.md",   "heading": "Type Narrowing" },
+  { "id": 9,  "question": "Wie speichere ich eine Liste fester Länge mit unterschiedlichen Typen pro Position?", "source_path": "typescript/basic-types.md", "heading": "Arrays und Tupel" },
+  { "id": 10, "question": "Wie halte ich in einer Komponente einen Wert, dessen Änderung neu rendert?",      "source_path": "react/hooks.md",              "heading": "useState" },
+  { "id": 11, "question": "Wie lade ich Daten, wenn die Komponente erscheint?",                              "source_path": "react/hooks.md",              "heading": "useEffect" },
+  { "id": 12, "question": "Wie reiche ich Daten tief durch den Baum, ohne Props durchzuschleifen?",          "source_path": "react/hooks.md",              "heading": "useContext" },
+  { "id": 13, "question": "Wie verhindere ich, dass eine teure Berechnung bei jedem Render neu läuft?",      "source_path": "react/hooks.md",              "heading": "useMemo und useCallback" },
+  { "id": 14, "question": "Darf ich einen Hook innerhalb einer Schleife oder Bedingung aufrufen?",           "source_path": "react/hooks.md",              "heading": "Die Rules of Hooks" },
+  { "id": 15, "question": "Wie lagere ich wiederkehrende Hook-Logik in eine eigene Funktion aus?",           "source_path": "react/hooks.md",              "heading": "Eigene Hooks (Custom Hooks)" },
+  { "id": 16, "question": "Wie lege ich eine neue, isolierte Entwicklungslinie an?",                         "source_path": "git/basics.md",               "heading": "Branches" },
+  { "id": 17, "question": "Wie führe ich zwei getrennte Historien wieder zusammen?",                         "source_path": "git/basics.md",               "heading": "Merge und Rebase" },
+  { "id": 18, "question": "Wie lege ich unfertige Änderungen kurz beiseite, ohne zu committen?",             "source_path": "git/basics.md",               "heading": "Stash" },
+  { "id": 19, "question": "Wie kehre ich einen bereits geteilten Commit sicher um?",                         "source_path": "git/basics.md",               "heading": "Änderungen rückgängig machen" },
+  { "id": 20, "question": "Was genau hält eine einzelne Momentaufnahme im Verlauf fest?",                    "source_path": "git/basics.md",               "heading": "Commits" }
+]
