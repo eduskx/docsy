@@ -10,8 +10,12 @@ export const GUEST = {
   ttlHours: 24, // Gast-Daten werden nach 24 h gelöscht
 } as const;
 
-/** Der Seed-/Demo-Korpus, den Gäste zusätzlich zu ihren Uploads durchsuchen dürfen. */
-export const DEMO_USER_ID = "seed";
+/**
+ * Der Standard-/Default-Korpus (eingebaute Doku, z.B. JavaScript). Wird von
+ * ALLEN Nutzern zusätzlich zu ihren eigenen Uploads durchsucht — Gäste wie
+ * angemeldete User. Gespeichert unter user_id = "seed" (via `npm run ingest`).
+ */
+export const DEFAULT_USER_ID = "seed";
 
 export function isGuest(userId: string): boolean {
   return userId.startsWith("guest:");

@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { search, type SearchResult } from "@/lib/retrieval/search";
 import {
   GUEST,
-  DEMO_USER_ID,
+  DEFAULT_USER_ID,
   isGuest,
   cleanupExpiredGuests,
   countRecentChats,
@@ -34,8 +34,10 @@ function buildSystemPrompt(results: SearchResult[]): string {
   return [
     "Du bist ein Wissensassistent für Entwickler-Dokumentation.",
     "Beantworte die Frage des Users AUSSCHLIESSLICH anhand der folgenden Doku-Ausschnitte.",
-    "Steht die Antwort nicht in den Ausschnitten, sag das ehrlich und rate nicht.",
-    "Zitiere die genutzten Stellen im Text mit [Quelle N].",
+    "Nutze KEIN Vorwissen und erfinde nichts.",
+    "Prüfe zuerst, ob die Ausschnitte die Frage überhaupt behandeln. Wenn nicht,",
+    'antworte NUR mit: "Dazu finde ich in deiner Doku nichts." — und nichts weiter.',
+    "Wenn sie die Frage behandeln, antworte knapp und zitiere die genutzten Stellen mit [Quelle N].",
     "",
     "=== Doku-Ausschnitte ===",
     context || "(keine relevanten Ausschnitte gefunden)",
@@ -103,9 +105,10 @@ export async function POST(req: Request) {
     `;
   }
 
-  // 1. Retrieval (Kernstelle #3). Gäste durchsuchen zusätzlich den Demo-Korpus,
-  //    GitHub-User nur ihre eigene Bibliothek.
-  const scope = guest ? [userId, DEMO_USER_ID] : [userId];
+  // 1. Retrieval (Kernstelle #3). ALLE Nutzer durchsuchen ihre eigene Bibliothek
+  //    UND den eingebauten Standard-Korpus (JavaScript etc.).
+  const scope =
+    userId === DEFAULT_USER_ID ? [userId] : [userId, DEFAULT_USER_ID];
   const results = await search(sql, message, TOP_K, scope);
 
   const sourcesPayload = results.map((r, i) => ({
@@ -124,6 +127,16 @@ export async function POST(req: Request) {
       const send = (obj: unknown) =>
         controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
 
+      // Assistant-Nachricht persistieren (nur GitHub-User mit Konversation).
+      const persistAssistant = async (text: string) => {
+        if (conversationId !== null && text.trim() !== "") {
+          await sql`
+            INSERT INTO messages (conversation_id, role, content, sources)
+            VALUES (${conversationId}, 'assistant', ${text}, ${sql.json(sourcesPayload)})
+          `;
+        }
+      };
+
       try {
         // Konversation zuerst, damit der Client die ID kennt (Verlauf).
         if (conversationId !== null) {
@@ -131,6 +144,16 @@ export async function POST(req: Request) {
         }
 
         send({ type: "sources", sources: sourcesPayload });
+
+        // Harter Riegel: keine Treffer (z.B. leere Bibliothek) -> kein LLM-Call.
+        if (results.length === 0) {
+          const msg =
+            "In deiner Bibliothek finde ich dazu nichts. Speise ein Dokument ein, das dein Thema abdeckt.";
+          send({ type: "text", text: msg });
+          await persistAssistant(msg);
+          send({ type: "done" });
+          return;
+        }
 
         const completion = await groq.chat.completions.create({
           model: CHAT_MODEL,
@@ -151,14 +174,7 @@ export async function POST(req: Request) {
           }
         }
 
-        // Antwort des Assistenten persistieren (nur GitHub-User).
-        if (conversationId !== null && assistantText.trim() !== "") {
-          await sql`
-            INSERT INTO messages (conversation_id, role, content, sources)
-            VALUES (${conversationId}, 'assistant', ${assistantText}, ${sql.json(sourcesPayload)})
-          `;
-        }
-
+        await persistAssistant(assistantText);
         send({ type: "done" });
       } catch (err) {
         send({

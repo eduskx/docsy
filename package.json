@@ -13,7 +13,8 @@
     "embed:try": "node --env-file=.env scripts/try-embed.ts",
     "ingest": "node --env-file=.env scripts/ingest.ts",
     "search:try": "node --env-file=.env scripts/try-search.ts",
-    "eval": "node --env-file=.env scripts/evaluate.ts"
+    "eval": "node --env-file=.env scripts/evaluate.ts",
+    "compare": "node --env-file=.env scripts/compare-search.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

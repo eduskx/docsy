@@ -21,7 +21,6 @@ type Doc = {
   title: string;
   sourcePath: string;
   chunkCount: number;
-  createdAt: string;
 };
 
 type Conversation = {
@@ -42,6 +41,7 @@ export function Chat({
 
   // --- Bibliothek / Upload ---
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [defaultDocs, setDefaultDocs] = useState<Doc[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -56,6 +56,7 @@ export function Chat({
     if (res.ok) {
       const data = await res.json();
       setDocs(data.documents ?? []);
+      setDefaultDocs(data.defaultDocuments ?? []);
     }
   }, []);
 
@@ -298,7 +299,7 @@ export function Chat({
             <h2 className="mb-2 text-sm font-medium">Deine Bibliothek ({docs.length})</h2>
             {docs.length === 0 ? (
               <p className="text-xs text-neutral-400">
-                Noch nichts eingespeist. Füg oben ein Markdown-Dokument hinzu.
+                Noch nichts Eigenes eingespeist. Füg oben Markdown hinzu.
               </p>
             ) : (
               <ul className="space-y-1 text-sm">
@@ -311,6 +312,23 @@ export function Chat({
               </ul>
             )}
           </section>
+
+          {defaultDocs.length > 0 && (
+            <section className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+              <h2 className="mb-1 text-sm font-medium">Standard-Bibliothek</h2>
+              <p className="mb-2 text-xs text-neutral-400">
+                Eingebaute Doku — für alle verfügbar.
+              </p>
+              <ul className="space-y-1 text-sm">
+                {defaultDocs.map((d) => (
+                  <li key={d.id} className="flex justify-between gap-2">
+                    <span className="truncate">{d.title}</span>
+                    <span className="shrink-0 text-xs text-neutral-400">{d.chunkCount}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </aside>
 
         {/* Chat */}
@@ -318,11 +336,9 @@ export function Chat({
           <div className="flex-1 space-y-6 overflow-y-auto p-4">
             {messages.length === 0 && (
               <div className="mt-16 text-center text-neutral-400">
-                {user.isGuest
-                  ? "Frag den Demo-Korpus (React, TypeScript, Git, async/await) — oder speise links eigene Doku ein."
-                  : docs.length === 0
-                    ? "Speise erst links eine Doku ein, dann frag sie hier."
-                    : "Stell eine Frage zu deiner Doku."}
+                {docs.length === 0
+                  ? "Frag die eingebaute Standard-Doku (JavaScript, TypeScript, …) — oder speise links eigene Doku ein."
+                  : "Stell eine Frage zu deiner oder der Standard-Doku."}
               </div>
             )}
             {messages.map((msg, i) => (
