@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { search, type SearchResult } from "@/lib/retrieval/search";
 import {
   GUEST,
-  DEMO_USER_ID,
+  DEFAULT_USER_ID,
   isGuest,
   cleanupExpiredGuests,
   countRecentChats,
@@ -105,9 +105,10 @@ export async function POST(req: Request) {
     `;
   }
 
-  // 1. Retrieval (Kernstelle #3). Gäste durchsuchen zusätzlich den Demo-Korpus,
-  //    GitHub-User nur ihre eigene Bibliothek.
-  const scope = guest ? [userId, DEMO_USER_ID] : [userId];
+  // 1. Retrieval (Kernstelle #3). ALLE Nutzer durchsuchen ihre eigene Bibliothek
+  //    UND den eingebauten Standard-Korpus (JavaScript etc.).
+  const scope =
+    userId === DEFAULT_USER_ID ? [userId] : [userId, DEFAULT_USER_ID];
   const results = await search(sql, message, TOP_K, scope);
 
   const sourcesPayload = results.map((r, i) => ({

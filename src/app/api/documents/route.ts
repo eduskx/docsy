@@ -1,7 +1,14 @@
 import { auth } from "@/auth";
 import { sql } from "@/lib/db";
 import { ingestDocument } from "@/lib/ingest/pipeline";
-import { GUEST, isGuest, cleanupExpiredGuests, countDocuments, logUsage } from "@/lib/limits";
+import {
+  GUEST,
+  DEFAULT_USER_ID,
+  isGuest,
+  cleanupExpiredGuests,
+  countDocuments,
+  logUsage,
+} from "@/lib/limits";
 
 export const runtime = "nodejs";
 
@@ -12,13 +19,16 @@ export async function GET() {
     return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
 
+  const cols = sql`
+    d.id,
+    d.title,
+    d.source_path    AS "sourcePath",
+    count(c.id)::int AS "chunkCount"
+  `;
+
+  // Eigene Bibliothek des Users.
   const documents = await sql`
-    SELECT
-      d.id,
-      d.title,
-      d.source_path             AS "sourcePath",
-      d.created_at              AS "createdAt",
-      count(c.id)::int          AS "chunkCount"
+    SELECT ${cols}
     FROM documents d
     LEFT JOIN chunks c ON c.document_id = d.id
     WHERE d.user_id = ${session.user.id}
@@ -26,7 +36,17 @@ export async function GET() {
     ORDER BY d.created_at DESC
   `;
 
-  return Response.json({ documents });
+  // Eingebauter Standard-Korpus (für alle sichtbar, read-only).
+  const defaultDocuments = await sql`
+    SELECT ${cols}
+    FROM documents d
+    LEFT JOIN chunks c ON c.document_id = d.id
+    WHERE d.user_id = ${DEFAULT_USER_ID}
+    GROUP BY d.id
+    ORDER BY d.title ASC
+  `;
+
+  return Response.json({ documents, defaultDocuments });
 }
 
 /** Ein Markdown-Dokument für den eingeloggten User einspeisen. */
