@@ -172,35 +172,51 @@ export function chunk(markdown: string): Chunk[] {
 
   // Schließt den aktuellen Abschnitt ab und hängt ihn als Chunk an —
   // sofern er überhaupt Inhalt hat.
+  function pushChunk(content: string) {
+    chunks.push({
+      content,
+      chunkIndex: chunks.length,
+      heading: currentHeading,
+      tokenCount: estimateTokens(content),
+    });
+  }
+
   function flush() {
     const content = currentLines.join("\n").trim();
     if (content === "") return; // leere Abschnitte überspringen
 
     if (estimateTokens(content) <= MAX_TOKENS) {
-      // Passt in einen Chunk — wie bisher.
-      chunks.push({
-        content,
-        chunkIndex: chunks.length,
-        heading: currentHeading,
-        tokenCount: estimateTokens(content),
-      });
+      // Passt in einen Chunk — Überschrift steckt bereits drin.
+      pushChunk(content);
       return;
     }
 
-    // Zu groß => Fallback: in mehrere Stücke schneiden. Jedes Stück wird ein
-    // eigener Chunk mit derselben Überschrift; chunkIndex zählt automatisch weiter.
-    for (const piece of splitBySize(content, MAX_TOKENS)) {
-      chunks.push({
-        content: piece,
-        chunkIndex: chunks.length,
-        heading: currentHeading,
-        tokenCount: estimateTokens(piece),
-      });
+    // Zu groß => Fallback. Überschrift vom Body trennen, Body splitten und die
+    // Überschrift JEDEM Teilstück voranstellen (contextual chunking) — sonst
+    // verlören alle Stücke außer dem ersten das Kontext-Signal im Embedding.
+    const headingLine = currentHeading !== null ? currentLines[0] : null;
+    const body =
+      currentHeading !== null ? currentLines.slice(1).join("\n").trim() : content;
+
+    for (const piece of splitBySize(body, MAX_TOKENS)) {
+      pushChunk(headingLine ? `${headingLine}\n\n${piece}` : piece);
     }
   }
 
+  // Verfolgt, ob wir gerade in einem ```-Codeblock sind. Wichtig, weil z.B.
+  // Bash-Kommentare ("# neuen Branch anlegen") sonst als Markdown-Überschriften
+  // missverstanden würden und den Abschnitt fälschlich zerschneiden.
+  let inCodeBlock = false;
+
   for (const line of lines) {
-    const match = line.match(HEADING_RE);
+    // Eine ```-Zeile öffnet oder schließt einen Codeblock.
+    if (/^\s*```/.test(line)) {
+      inCodeBlock = !inCodeBlock;
+      currentLines.push(line);
+      continue;
+    }
+
+    const match = inCodeBlock ? null : line.match(HEADING_RE);
 
     if (match) {
       // Neue Überschrift => vorherigen Abschnitt abschließen, neuen beginnen.

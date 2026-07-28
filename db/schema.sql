@@ -40,6 +40,14 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
 
 CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks(document_id);
 
+-- Volltext-Suche (für die hybride Suche): generierte tsvector-Spalte + GIN-Index.
+-- 'german'-Config: Stemming für die deutschen Doku-Texte.
+ALTER TABLE chunks
+  ADD COLUMN IF NOT EXISTS content_tsv tsvector
+  GENERATED ALWAYS AS (to_tsvector('german', content)) STORED;
+
+CREATE INDEX IF NOT EXISTS chunks_content_tsv_idx ON chunks USING GIN (content_tsv);
+
 -- Verlauf: eine Konversation pro Chat-Sitzung, gehört einem User.
 CREATE TABLE IF NOT EXISTS conversations (
   id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
