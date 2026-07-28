@@ -19,7 +19,7 @@ const sql = postgres(DB_URL, { prepare: false });
 
 try {
   console.log(`\nFrage: "${query}"\n`);
-  const results = await search(sql, query, 5);
+  const results = await search(sql, query, 5, ["seed"]);
 
   if (results.length === 0) {
     console.log("Keine Treffer — ist schon etwas per `npm run ingest` eingespeist?");

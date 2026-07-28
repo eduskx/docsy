@@ -7,11 +7,17 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Eine eingespeiste Doku-Quelle (z.B. "Next.js App Router", eine Markdown-Datei/Sammlung).
 CREATE TABLE IF NOT EXISTS documents (
   id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id     TEXT NOT NULL DEFAULT 'seed', -- gehört zu welchem User (Auth.js-ID)
   title       TEXT NOT NULL,
   source      TEXT NOT NULL,            -- z.B. "nextjs", "react", "typescript"
   source_path TEXT,                     -- Original-Dateipfad/URL, für Quellenangabe
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Falls die Tabelle schon ohne user_id existiert (ältere DB): Spalte nachrüsten.
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'seed';
+
+CREATE INDEX IF NOT EXISTS documents_user_id_idx ON documents(user_id);
 
 -- Ein Chunk eines Dokuments inkl. Embedding.
 -- Dimension 1024 = Voyage "voyage-3" / "voyage-3.5". Bei anderem Modell anpassen!
@@ -33,3 +39,35 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
   ON chunks USING hnsw (embedding vector_cosine_ops);
 
 CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks(document_id);
+
+-- Verlauf: eine Konversation pro Chat-Sitzung, gehört einem User.
+CREATE TABLE IF NOT EXISTS conversations (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS conversations_user_id_idx ON conversations(user_id);
+
+-- Einzelne Nachrichten innerhalb einer Konversation.
+CREATE TABLE IF NOT EXISTS messages (
+  id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  role            TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content         TEXT NOT NULL,
+  sources         JSONB,               -- bei Assistant-Nachrichten: die Quellen
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS messages_conversation_id_idx ON messages(conversation_id);
+
+-- Usage-Events für Rate-Limiting (v.a. Gäste): ein Eintrag pro Chat/Upload.
+CREATE TABLE IF NOT EXISTS usage_events (
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  kind       TEXT NOT NULL CHECK (kind IN ('chat', 'upload')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS usage_events_user_time_idx ON usage_events(user_id, created_at);
