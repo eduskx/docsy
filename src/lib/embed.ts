@@ -46,40 +46,56 @@ export async function embed(
 ): Promise<number[][]> {
   if (texts.length === 0) return [];
 
-  let response: Response;
-  try {
-    response = await fetch(VOYAGE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getApiKey()}`,
-      },
-      body: JSON.stringify({
-        model: EMBEDDING_MODEL,
-        input: texts,
-        input_type: inputType,
-      }),
-    });
-  } catch (cause) {
-    // fetch rejectet NUR bei Netzwerkfehlern (offline, DNS, Verbindung abgebrochen).
-    // Ein HTTP-Fehlerstatus (4xx/5xx) landet NICHT hier — den prüfen wir unten.
-    throw new Error("Voyage-Request fehlgeschlagen (Netzwerkfehler).", { cause });
-  }
+  const MAX_RETRIES = 6;
 
-  if (!response.ok) {
-    // Fehlerantwort mitlesen, damit die Meldung brauchbar ist (z.B. 401 falscher Key,
-    // 429 Rate-Limit, 400 Text zu lang).
+  for (let attempt = 0; ; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(VOYAGE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getApiKey()}`,
+        },
+        body: JSON.stringify({
+          model: EMBEDDING_MODEL,
+          input: texts,
+          input_type: inputType,
+        }),
+      });
+    } catch (cause) {
+      // fetch rejectet NUR bei Netzwerkfehlern (offline, DNS, Verbindung abgebrochen).
+      // Ein HTTP-Fehlerstatus (4xx/5xx) landet NICHT hier — den prüfen wir unten.
+      throw new Error("Voyage-Request fehlgeschlagen (Netzwerkfehler).", { cause });
+    }
+
+    if (response.ok) {
+      const json = (await response.json()) as VoyageResponse;
+      // Nach index sortieren, damit die Reihenfolge garantiert zur Eingabe passt.
+      return json.data
+        .slice()
+        .sort((a, b) => a.index - b.index)
+        .map((item) => item.embedding);
+    }
+
+    // Fehlerantwort mitlesen (z.B. 401 falscher Key, 429 Rate-Limit, 400 Text zu lang).
     const body = await response.text().catch(() => "");
+
+    // 429 (Rate-Limit) und 5xx sind transient -> mit Backoff neu versuchen.
+    // Alles andere (400, 401, …) ist dauerhaft -> sofort werfen.
+    const transient = response.status === 429 || response.status >= 500;
+    if (transient && attempt < MAX_RETRIES) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      const waitMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : Math.min(1000 * 2 ** attempt, 30_000); // 1s,2s,4s,8s,16s,30s
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
     throw new Error(`Voyage-API-Fehler ${response.status}: ${body}`);
   }
-
-  const json = (await response.json()) as VoyageResponse;
-
-  // Nach index sortieren, damit die Reihenfolge garantiert zur Eingabe passt.
-  return json.data
-    .slice()
-    .sort((a, b) => a.index - b.index)
-    .map((item) => item.embedding);
 }
 
 /** Bequemlichkeit für einen einzelnen Text (z.B. eine Suchanfrage). */

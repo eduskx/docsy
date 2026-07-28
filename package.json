@@ -12,7 +12,8 @@
     "chunk:try": "node scripts/try-chunk.ts",
     "embed:try": "node --env-file=.env scripts/try-embed.ts",
     "ingest": "node --env-file=.env scripts/ingest.ts",
-    "search:try": "node --env-file=.env scripts/try-search.ts"
+    "search:try": "node --env-file=.env scripts/try-search.ts",
+    "eval": "node --env-file=.env scripts/evaluate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
