@@ -1,6 +1,15 @@
 import Groq from "groq-sdk";
+import { auth } from "@/auth";
 import { sql } from "@/lib/db";
 import { search, type SearchResult } from "@/lib/retrieval/search";
+import {
+  GUEST,
+  DEMO_USER_ID,
+  isGuest,
+  cleanupExpiredGuests,
+  countRecentChats,
+  logUsage,
+} from "@/lib/limits";
 
 // postgres.js braucht die Node-Runtime (nicht Edge).
 export const runtime = "nodejs";
@@ -34,19 +43,77 @@ function buildSystemPrompt(results: SearchResult[]): string {
 }
 
 export async function POST(req: Request) {
-  let raw: unknown;
+  const session = await auth();
+  if (!session?.user?.id) {
+    return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
+  }
+
+  let body: { message?: unknown; conversationId?: unknown };
   try {
-    ({ message: raw } = await req.json());
+    body = await req.json();
   } catch {
     return Response.json({ error: "Ungültiger Request-Body." }, { status: 400 });
   }
-  if (typeof raw !== "string" || raw.trim() === "") {
+  if (typeof body.message !== "string" || body.message.trim() === "") {
     return Response.json({ error: "Feld 'message' fehlt." }, { status: 400 });
   }
-  const message: string = raw;
+  const message: string = body.message;
+  const userId = session.user.id;
+  const guest = isGuest(userId);
 
-  // 1. Retrieval: passende Chunks holen (Kernstelle #3).
-  const results = await search(sql, message, TOP_K);
+  // Gäste: aufräumen, Rate-Limit prüfen, protokollieren.
+  if (guest) {
+    await cleanupExpiredGuests(sql);
+    const recent = await countRecentChats(sql, userId);
+    if (recent >= GUEST.chatPerHour) {
+      return Response.json(
+        { error: `Gast-Limit erreicht (${GUEST.chatPerHour} Fragen/Stunde). Melde dich an für unbegrenzten Zugriff.` },
+        { status: 429 },
+      );
+    }
+    await logUsage(sql, userId, "chat");
+  }
+
+  // Verlauf: nur für angemeldete GitHub-User persistieren.
+  // Bestehende Konversation fortführen oder neue anlegen; User-Nachricht speichern.
+  let conversationId: number | null = null;
+  let conversationTitle: string | null = null;
+  if (!guest) {
+    const provided = Number(body.conversationId);
+    if (Number.isInteger(provided) && provided > 0) {
+      const [c] = await sql<{ id: number; title: string }[]>`
+        SELECT id, title FROM conversations WHERE id = ${provided} AND user_id = ${userId}
+      `;
+      if (c) {
+        conversationId = Number(c.id);
+        conversationTitle = c.title;
+      }
+    }
+    if (conversationId === null) {
+      conversationTitle = message.slice(0, 60);
+      const [c] = await sql<{ id: number }[]>`
+        INSERT INTO conversations (user_id, title) VALUES (${userId}, ${conversationTitle})
+        RETURNING id
+      `;
+      conversationId = Number(c.id);
+    }
+    await sql`
+      INSERT INTO messages (conversation_id, role, content)
+      VALUES (${conversationId}, 'user', ${message})
+    `;
+  }
+
+  // 1. Retrieval (Kernstelle #3). Gäste durchsuchen zusätzlich den Demo-Korpus,
+  //    GitHub-User nur ihre eigene Bibliothek.
+  const scope = guest ? [userId, DEMO_USER_ID] : [userId];
+  const results = await search(sql, message, TOP_K, scope);
+
+  const sourcesPayload = results.map((r, i) => ({
+    index: i + 1,
+    heading: r.heading,
+    sourcePath: r.sourcePath,
+    similarity: r.similarity,
+  }));
 
   const groq = new Groq(); // liest GROQ_API_KEY aus der Umgebung
   const encoder = new TextEncoder();
@@ -58,15 +125,12 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
 
       try {
-        send({
-          type: "sources",
-          sources: results.map((r, i) => ({
-            index: i + 1,
-            heading: r.heading,
-            sourcePath: r.sourcePath,
-            similarity: r.similarity,
-          })),
-        });
+        // Konversation zuerst, damit der Client die ID kennt (Verlauf).
+        if (conversationId !== null) {
+          send({ type: "conversation", id: conversationId, title: conversationTitle });
+        }
+
+        send({ type: "sources", sources: sourcesPayload });
 
         const completion = await groq.chat.completions.create({
           model: CHAT_MODEL,
@@ -78,9 +142,21 @@ export async function POST(req: Request) {
           ],
         });
 
+        let assistantText = "";
         for await (const chunk of completion) {
           const delta = chunk.choices[0]?.delta?.content;
-          if (delta) send({ type: "text", text: delta });
+          if (delta) {
+            assistantText += delta;
+            send({ type: "text", text: delta });
+          }
+        }
+
+        // Antwort des Assistenten persistieren (nur GitHub-User).
+        if (conversationId !== null && assistantText.trim() !== "") {
+          await sql`
+            INSERT INTO messages (conversation_id, role, content, sources)
+            VALUES (${conversationId}, 'assistant', ${assistantText}, ${sql.json(sourcesPayload)})
+          `;
         }
 
         send({ type: "done" });

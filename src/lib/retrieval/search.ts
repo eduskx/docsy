@@ -30,10 +30,17 @@ export async function search(
   sql: Db,
   query: string,
   topK = 5,
+  userIds?: string[],
 ): Promise<SearchResult[]> {
   // 1. Frage embedden — WICHTIG: input_type "query", nicht "document".
   const queryVector = await embedOne(query, "query");
   const literal = `[${queryVector.join(",")}]`;
+
+  // Nur Dokumente dieser User-IDs durchsuchen (Multi-User-Trennung).
+  // Ein Gast bekommt z.B. [seine-guest-id, "seed"], ein GitHub-User nur [seine-id].
+  // Ohne userIds (z.B. in der Eval) wird der gesamte Korpus durchsucht.
+  const userFilter =
+    userIds && userIds.length > 0 ? sql`WHERE d.user_id = ANY(${userIds})` : sql``;
 
   // 2. Ähnlichste Chunks holen.
   //    <=> ist der Cosinus-DISTANZ-Operator von pgvector (0 = identisch).
@@ -51,6 +58,7 @@ export async function search(
       1 - (c.embedding <=> ${literal}::vector) AS similarity
     FROM chunks c
     JOIN documents d ON d.id = c.document_id
+    ${userFilter}
     ORDER BY c.embedding <=> ${literal}::vector
     LIMIT ${topK}
   `;

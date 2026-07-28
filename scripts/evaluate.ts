@@ -62,7 +62,7 @@ try {
   console.log("────  ────────  ─────");
 
   for (const tc of testset) {
-    const results = await search(sql, tc.question, K);
+    const results = await search(sql, tc.question, K, ["seed"]);
     const rank = rankOfCorrect(results, tc);
 
     if (rank !== null) {
