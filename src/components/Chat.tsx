@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { githubSignOut } from "@/app/actions";
+import { MarkdownMessage } from "@/components/MarkdownMessage";
 
 type Source = {
   index: number;
@@ -341,34 +342,52 @@ export function Chat({
                   : "Stell eine Frage zu deiner oder der Standard-Doku."}
               </div>
             )}
-            {messages.map((msg, i) => (
-              <div key={i} className={msg.role === "user" ? "text-right" : "text-left"}>
-                <div
-                  className={
-                    "inline-block max-w-[90%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-left " +
-                    (msg.role === "user"
-                      ? "bg-blue-600 text-white"
-                      : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
-                  }
-                >
-                  {msg.content || (busy && i === messages.length - 1 ? "…" : "")}
-                </div>
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-2 space-y-1 text-left text-xs text-neutral-500">
-                    <div className="font-medium">Quellen:</div>
-                    {msg.sources.map((s) => (
-                      <div key={s.index}>
-                        [{s.index}] {s.sourcePath}
-                        {s.heading ? ` — ${s.heading}` : ""}{" "}
-                        <span className="text-neutral-400">
-                          ({(s.similarity * 100).toFixed(0)}%)
-                        </span>
-                      </div>
-                    ))}
+            {messages.map((msg, i) => {
+              const isLast = i === messages.length - 1;
+              const waiting = msg.role === "assistant" && msg.content === "" && busy && isLast;
+              return (
+                <div key={i} className={msg.role === "user" ? "text-right" : "text-left"}>
+                  <div
+                    className={
+                      "inline-block max-w-[90%] rounded-2xl px-4 py-2 text-left " +
+                      (msg.role === "user"
+                        ? "whitespace-pre-wrap bg-blue-600 text-white"
+                        : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
+                    }
+                  >
+                    {msg.role === "user" ? (
+                      msg.content
+                    ) : waiting ? (
+                      <span className="flex gap-1 py-1" aria-label="Antwort wird generiert">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.3s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.15s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400" />
+                      </span>
+                    ) : (
+                      <MarkdownMessage content={msg.content} msgId={`msg-${i}`} />
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-2 space-y-1 text-left text-xs text-neutral-500">
+                      <div className="font-medium">Quellen:</div>
+                      {msg.sources.map((s) => (
+                        <div
+                          key={s.index}
+                          id={`msg-${i}-src-${s.index}`}
+                          className="rounded px-1 transition-shadow"
+                        >
+                          [{s.index}] {s.sourcePath}
+                          {s.heading ? ` — ${s.heading}` : ""}{" "}
+                          <span className="text-neutral-400">
+                            ({(s.similarity * 100).toFixed(0)}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             <div ref={bottomRef} />
           </div>
 
