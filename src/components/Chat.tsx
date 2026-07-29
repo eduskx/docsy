@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { githubSignOut } from "@/app/actions";
 import { MarkdownMessage } from "@/components/MarkdownMessage";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Source = {
   index: number;
   heading: string | null;
   sourcePath: string;
   similarity: number;
+  content?: string;
 };
 
 type Message = {
@@ -64,7 +66,12 @@ export function Chat({
   const loadConvs = useCallback(async () => {
     if (user.isGuest) return;
     const res = await fetch("/api/conversations");
-    if (res.ok) setConvs((await res.json()).conversations ?? []);
+    if (res.ok) {
+      const list: Conversation[] = (await res.json()).conversations ?? [];
+      // postgres.js liefert BIGINT als String -> auf Number normalisieren, damit
+      // strikte Vergleiche (=== conversationId) verlässlich funktionieren.
+      setConvs(list.map((c) => ({ ...c, id: Number(c.id) })));
+    }
   }, [user.isGuest]);
 
   useEffect(() => {
@@ -75,6 +82,23 @@ export function Chat({
   function newChat() {
     setMessages([]);
     setConversationId(null);
+  }
+
+  /** Eigenes Dokument löschen (Chunks gehen serverseitig per CASCADE mit). */
+  async function deleteDoc(id: number, docTitle: string) {
+    if (!confirm(`„${docTitle}" wirklich löschen?`)) return;
+    const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
+    if (res.ok) await loadDocs();
+  }
+
+  /** Konversation löschen; war sie gerade offen, auf neuen Chat zurücksetzen. */
+  async function deleteConv(id: number) {
+    if (!confirm("Diese Konversation löschen?")) return;
+    const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      if (id === conversationId) newChat();
+      await loadConvs();
+    }
   }
 
   async function loadConversation(id: number) {
@@ -120,17 +144,37 @@ export function Chat({
     }
   }
 
-  async function send() {
-    const question = input.trim();
-    if (!question || busy) return;
+  /**
+   * Lädt eine gewählte .md-Datei clientseitig und füllt Titel + Inhalt vor.
+   * Nur Markdown wird akzeptiert (PDF bewusst nicht — zerstört die Struktur, auf
+   * die Chunking und Quellenanzeige angewiesen sind). Der User prüft/editiert
+   * danach und klickt „Einspeisen".
+   */
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // Reset -> dieselbe Datei kann erneut gewählt werden
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".md") && !name.endsWith(".markdown")) {
+      setUploadMsg("⚠ Nur Markdown-Dateien (.md) werden unterstützt.");
+      return;
+    }
+    const text = await file.text();
+    setContent(text);
+    if (!title.trim()) setTitle(file.name.replace(/\.(md|markdown)$/i, ""));
+    setUploadMsg(
+      `📄 „${file.name}" geladen (${(file.size / 1000).toFixed(1)} KB) — prüfen und einspeisen.`,
+    );
+  }
 
-    setInput("");
+  /**
+   * Kern des Chats: schickt die Frage an /api/chat und streamt die Antwort in
+   * die letzte (leere) Assistant-Nachricht. Wird von send() und regenerate()
+   * geteilt. `regenerate` sagt dem Server, die letzte Antwort zu ersetzen statt
+   * eine neue User-Nachricht anzulegen.
+   */
+  async function streamAnswer(question: string, regenerate: boolean) {
     setBusy(true);
-    setMessages((m) => [
-      ...m,
-      { role: "user", content: question },
-      { role: "assistant", content: "" },
-    ]);
 
     const patchLast = (fn: (msg: Message) => Message) =>
       setMessages((m) => {
@@ -143,7 +187,7 @@ export function Chat({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, conversationId }),
+        body: JSON.stringify({ message: question, conversationId, regenerate }),
       });
       if (!res.ok || !res.body) {
         const errData = await res.json().catch(() => null);
@@ -185,6 +229,38 @@ export function Chat({
     }
   }
 
+  async function send() {
+    const question = input.trim();
+    if (!question || busy) return;
+
+    setInput("");
+    setMessages((m) => [
+      ...m,
+      { role: "user", content: question },
+      { role: "assistant", content: "" },
+    ]);
+    await streamAnswer(question, false);
+  }
+
+  /** Die letzte Antwort verwerfen und zur letzten Frage neu generieren. */
+  async function regenerate() {
+    if (busy) return;
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (!lastUser) return;
+
+    // Letzte Assistant-Nachricht auf leer zurücksetzen (Platzhalter zum Streamen).
+    setMessages((m) => {
+      const copy = m.slice();
+      if (copy.length > 0 && copy[copy.length - 1].role === "assistant") {
+        copy[copy.length - 1] = { role: "assistant", content: "" };
+      } else {
+        copy.push({ role: "assistant", content: "" });
+      }
+      return copy;
+    });
+    await streamAnswer(lastUser.content, true);
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -213,6 +289,7 @@ export function Chat({
               </span>
             )}
           </span>
+          <ThemeToggle />
           <form action={githubSignOut}>
             <button
               type="submit"
@@ -243,17 +320,25 @@ export function Chat({
               ) : (
                 <ul className="space-y-0.5 text-sm">
                   {convs.map((c) => (
-                    <li key={c.id}>
+                    <li key={c.id} className="group flex items-center gap-1">
                       <button
                         onClick={() => void loadConversation(c.id)}
                         className={
-                          "w-full truncate rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 " +
+                          "min-w-0 flex-1 truncate rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 " +
                           (c.id === conversationId
                             ? "bg-neutral-100 font-medium dark:bg-neutral-800"
                             : "")
                         }
                       >
                         {c.title}
+                      </button>
+                      <button
+                        onClick={() => void deleteConv(c.id)}
+                        title="Löschen"
+                        aria-label="Konversation löschen"
+                        className="shrink-0 px-1 text-neutral-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                      >
+                        🗑
                       </button>
                     </li>
                   ))}
@@ -273,6 +358,16 @@ export function Chat({
           )}
           <section className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
             <h2 className="mb-2 text-sm font-medium">Doku einspeisen</h2>
+            <label className="mb-1 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:border-blue-500 hover:text-blue-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-blue-500">
+              <input
+                type="file"
+                accept=".md,.markdown,text/markdown"
+                className="hidden"
+                onChange={(e) => void handleFile(e)}
+              />
+              📄 Markdown-Datei wählen (.md)
+            </label>
+            <p className="mb-2 text-center text-xs text-neutral-400">oder Felder manuell ausfüllen</p>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -305,9 +400,19 @@ export function Chat({
             ) : (
               <ul className="space-y-1 text-sm">
                 {docs.map((d) => (
-                  <li key={d.id} className="flex justify-between gap-2">
+                  <li key={d.id} className="group flex items-center justify-between gap-2">
                     <span className="truncate">{d.title}</span>
-                    <span className="shrink-0 text-xs text-neutral-400">{d.chunkCount}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span className="text-xs text-neutral-400">{d.chunkCount}</span>
+                      <button
+                        onClick={() => void deleteDoc(d.id, d.title)}
+                        title="Löschen"
+                        aria-label={`„${d.title}" löschen`}
+                        className="text-neutral-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                      >
+                        🗑
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -371,19 +476,57 @@ export function Chat({
                     <div className="mt-2 space-y-1 text-left text-xs text-neutral-500">
                       <div className="font-medium">Quellen:</div>
                       {msg.sources.map((s) => (
-                        <div
+                        <details
                           key={s.index}
                           id={`msg-${i}-src-${s.index}`}
-                          className="rounded px-1 transition-shadow"
+                          className="group rounded px-1 transition-shadow"
                         >
-                          [{s.index}] {s.sourcePath}
-                          {s.heading ? ` — ${s.heading}` : ""}{" "}
-                          <span className="text-neutral-400">
-                            ({(s.similarity * 100).toFixed(0)}%)
-                          </span>
-                        </div>
+                          <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+                            <span className="select-none text-neutral-400 transition-transform group-open:rotate-90">
+                              ▸
+                            </span>
+                            <span>
+                              [{s.index}] {s.sourcePath}
+                              {s.heading ? ` — ${s.heading}` : ""}{" "}
+                              <span className="text-neutral-400">
+                                ({(s.similarity * 100).toFixed(0)}%)
+                              </span>
+                            </span>
+                          </summary>
+                          {s.content ? (
+                            <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded-md bg-neutral-100 p-2 font-mono text-[11px] leading-relaxed text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+                              {s.content}
+                            </pre>
+                          ) : (
+                            <p className="mt-1 pl-4 italic text-neutral-400">
+                              (Kein Auszug gespeichert — ältere Konversation.)
+                            </p>
+                          )}
+                        </details>
                       ))}
                     </div>
+                  )}
+                  {msg.role === "assistant" && isLast && !busy && msg.content !== "" && (
+                    <button
+                      onClick={() => void regenerate()}
+                      className="mt-2 flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                        <path d="M3 3v5h5" />
+                      </svg>
+                      Neu generieren
+                    </button>
                   )}
                 </div>
               );

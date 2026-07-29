@@ -1,9 +1,42 @@
 "use client";
 
+import { useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
+
+/** Codeblock mit Copy-Button (liest den gerenderten Text aus dem <pre>). */
+function CodeBlock({ children }: { children?: React.ReactNode }) {
+  const preRef = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    const text = preRef.current?.innerText ?? "";
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard-API nicht verfügbar (z.B. ohne HTTPS) -> still ignorieren.
+    }
+  }
+
+  return (
+    <div className="group/code relative mb-3 last:mb-0">
+      <button
+        type="button"
+        onClick={copy}
+        className="absolute right-2 top-2 rounded border border-white/15 bg-white/10 px-2 py-0.5 text-xs text-neutral-200 opacity-0 transition-opacity hover:bg-white/20 group-hover/code:opacity-100"
+      >
+        {copied ? "Kopiert ✓" : "Kopieren"}
+      </button>
+      <pre ref={preRef} className="overflow-x-auto rounded-lg bg-neutral-900 p-3 text-sm">
+        {children}
+      </pre>
+    </div>
+  );
+}
 
 /**
  * Rendert die Markdown-Antwort des Assistenten als echtes HTML statt rohem Text.
@@ -27,6 +60,8 @@ function linkifyCitations(text: string, msgId: string) {
         type="button"
         onClick={() => {
           const el = document.getElementById(`${msgId}-src-${n}`);
+          // Ist die Quelle ein <details>, gleich aufklappen (zeigt den Chunk-Text).
+          if (el instanceof HTMLDetailsElement) el.open = true;
           el?.scrollIntoView({ behavior: "smooth", block: "center" });
           el?.classList.add("ring-2", "ring-blue-400");
           setTimeout(() => el?.classList.remove("ring-2", "ring-blue-400"), 1200);
@@ -80,11 +115,7 @@ export function MarkdownMessage({ content, msgId }: { content: string; msgId: st
         </code>
       );
     },
-    pre: ({ children }) => (
-      <pre className="mb-3 overflow-x-auto rounded-lg bg-neutral-900 p-3 text-sm last:mb-0">
-        {children}
-      </pre>
-    ),
+    pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
     table: ({ children }) => (
       <div className="mb-3 overflow-x-auto last:mb-0">
         <table className="w-full border-collapse text-sm">{children}</table>
