@@ -202,7 +202,7 @@ export async function POST(req: Request) {
         // Harter Riegel: keine Treffer (z.B. leere Bibliothek) -> kein LLM-Call.
         if (results.length === 0) {
           const msg =
-            "In deiner Bibliothek finde ich dazu nichts. Speise ein Dokument ein, das dein Thema abdeckt.";
+            "In deiner Bibliothek finde ich dazu nichts. Lade ein Dokument hoch, das dein Thema abdeckt.";
           send({ type: "text", text: msg });
           await persistAssistant(msg);
           await maybeUpdateTitle();
