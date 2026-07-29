@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
 
-  let body: { message?: unknown; conversationId?: unknown };
+  let body: { message?: unknown; conversationId?: unknown; regenerate?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Feld 'message' fehlt." }, { status: 400 });
   }
   const message: string = body.message;
+  const regenerate = body.regenerate === true;
   const userId = session.user.id;
   const guest = isGuest(userId);
 
@@ -99,10 +100,23 @@ export async function POST(req: Request) {
       `;
       conversationId = Number(c.id);
     }
-    await sql`
-      INSERT INTO messages (conversation_id, role, content)
-      VALUES (${conversationId}, 'user', ${message})
-    `;
+    if (regenerate && conversationId !== null) {
+      // Regenerate: die letzte Assistant-Antwort entfernen (wird neu erzeugt) —
+      // KEINE neue User-Nachricht anlegen, sonst entstünde eine Dublette.
+      await sql`
+        DELETE FROM messages
+        WHERE id = (
+          SELECT id FROM messages
+          WHERE conversation_id = ${conversationId} AND role = 'assistant'
+          ORDER BY id DESC LIMIT 1
+        )
+      `;
+    } else {
+      await sql`
+        INSERT INTO messages (conversation_id, role, content)
+        VALUES (${conversationId}, 'user', ${message})
+      `;
+    }
   }
 
   // 1. Retrieval (Kernstelle #3). ALLE Nutzer durchsuchen ihre eigene Bibliothek
@@ -116,6 +130,9 @@ export async function POST(req: Request) {
     heading: r.heading,
     sourcePath: r.sourcePath,
     similarity: r.similarity,
+    // Der tatsächliche Chunk-Text, der die Antwort stützt — im UI aufklappbar,
+    // damit Nutzer die Antwort direkt an der Quelle nachprüfen können.
+    content: r.content,
   }));
 
   const groq = new Groq(); // liest GROQ_API_KEY aus der Umgebung

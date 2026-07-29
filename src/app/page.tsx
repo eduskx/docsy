@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { githubSignIn, guestSignIn } from "@/app/actions";
 import { isGuest } from "@/lib/limits";
 import { Chat } from "@/components/Chat";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default async function Home() {
   const session = await auth();
@@ -10,6 +11,9 @@ export default async function Home() {
   if (!session?.user?.id) {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-6 px-4 text-center">
+        <div className="fixed right-4 top-4">
+          <ThemeToggle />
+        </div>
         <div>
           <h1 className="text-3xl font-semibold">docsy</h1>
           <p className="mt-2 max-w-md text-neutral-500">
