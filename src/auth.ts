@@ -26,6 +26,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: { strategy: "jwt" },
   callbacks: {
+    /**
+     * STABILE User-ID pinnen. Ohne das generiert Auth.js (JWT, kein DB-Adapter)
+     * bei JEDEM GitHub-Login eine neue zufällige UUID als token.sub — dadurch
+     * gingen Verlauf und Bibliothek beim Ab-/Wieder-Anmelden verloren. Die
+     * GitHub-Profil-ID ist über alle Logins hinweg konstant.
+     */
+    jwt({ token, account, profile }) {
+      if (account?.provider === "github") {
+        const id = (profile as { id?: number | string } | undefined)?.id;
+        if (id != null) token.sub = `github:${id}`;
+      }
+      return token;
+    },
     session({ session, token }) {
       if (token.sub) {
         session.user.id = token.sub;

@@ -1,28 +1,119 @@
 @import "tailwindcss";
 
-/* Dark Mode klassenbasiert (statt prefers-color-scheme): der `dark:`-Variant
-   greift, wenn `.dark` auf <html> gesetzt ist. Der Toggle setzt diese Klasse. */
+/* Dark Mode klassenbasiert: der `dark:`-Variant greift, wenn `.dark` auf <html>
+   sitzt (gesetzt vom Anti-Flash-Script + Toggle). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Design-System „Linear" ──────────────────────────────────────────────
+   Fast schwarzer Grund, Indigo-Akzent, feine Hairline-Ränder. Alle Farben als
+   semantische Tokens; Komponenten stylen über die Tokens, nie über rohe Hex.
+   Kontraste sind gegen WCAG AA geprüft (Fließtext ≥ 4.5:1). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f4f4f7;
+  --surface: #ffffff;
+  --surface-2: #ececf2;
+  --fg: #1b1b22;
+  --muted: #63636f;
+  --border: #e4e4ec;
+  --accent: #5e6ad2;
+  --accent-hover: #4f5ac6;
+  --accent-fg: #ffffff;
+  --accent-strong: #4c53c0; /* Links / kleiner Akzenttext auf hellem Grund */
+  --user-bg: #5e6ad2;
+  --user-fg: #ffffff;
+  --code-bg: #1b1b22;
+  --code-fg: #edeef2;
+  --ring: #5e6ad2;
+  --radius: 13px;
+}
+
+.dark {
+  --bg: #08080b;
+  --surface: #13131a;
+  --surface-2: #1c1c26;
+  --fg: #ededf0;
+  --muted: #9297a1;
+  --border: #24242f;
+  --accent: #5e6ad2;
+  --accent-hover: #6b76dd;
+  --accent-fg: #ffffff;
+  --accent-strong: #9aa0ef; /* Links / kleiner Akzenttext auf dunklem Grund */
+  --user-bg: #5e6ad2;
+  --user-fg: #ffffff;
+  --code-bg: #0b0b12;
+  --code-fg: #d6d8e0;
+  --ring: #8b93e6;
+  --radius: 13px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-strong: var(--accent-strong);
+  --color-user: var(--user-bg);
+  --color-user-fg: var(--user-fg);
+  --color-code: var(--code-bg);
+  --color-code-fg: var(--code-fg);
+  --color-ring: var(--ring);
+  --radius-app: var(--radius);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+body {
+  background: var(--bg);
+  color: var(--fg);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Dezente, schlanke Scrollbars — passt sich per Token an Hell/Dunkel an. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Mobile-Drawer: unter md standardmäßig eingeschoben; die Klasse `.drawer-closed`
+   schiebt ihn nach links raus. Nur EINE Transform-Regel -> kein Cascade-Gleichstand.
+   Ab md greift die Regel nicht -> die Sidebar steht normal in der Spalte. */
+.drawer {
+  transition: transform 0.2s ease-out;
+}
+@media (max-width: 767px) {
+  .drawer {
+    transform: translateX(0);
+  }
+  .drawer.drawer-closed {
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    transition: none;
+  }
 }

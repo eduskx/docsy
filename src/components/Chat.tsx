@@ -4,6 +4,38 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { githubSignOut } from "@/app/actions";
 import { MarkdownMessage } from "@/components/MarkdownMessage";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Logo } from "@/components/Logo";
+
+/** Kleine Inline-Icons (currentColor) — keine Emojis (Design-Checkliste). */
+const svg = "1.5";
+function IconTrash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={svg} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </svg>
+  );
+}
+function IconFile() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={svg} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+    </svg>
+  );
+}
+function IconMenu() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={svg} strokeLinecap="round" aria-hidden="true">
+      <path d="M3 6h18M3 12h18M3 18h18" />
+    </svg>
+  );
+}
+function IconClose() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={svg} strokeLinecap="round" aria-hidden="true">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
 
 type Source = {
   index: number;
@@ -53,6 +85,9 @@ export function Chat({
   // --- Verlauf (nur GitHub-User) ---
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [convs, setConvs] = useState<Conversation[]>([]);
+
+  // --- Mobile: Sidebar als Off-Canvas-Drawer ---
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const loadDocs = useCallback(async () => {
     const res = await fetch("/api/documents");
@@ -133,7 +168,7 @@ export function Chat({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Fehler ${res.status}`);
-      setUploadMsg(`✅ „${title}" eingespeist (${data.chunks} Chunks)`);
+      setUploadMsg(`✅ „${title}" hochgeladen (${data.chunks} Chunks)`);
       setTitle("");
       setContent("");
       await loadDocs();
@@ -163,7 +198,7 @@ export function Chat({
     setContent(text);
     if (!title.trim()) setTitle(file.name.replace(/\.(md|markdown)$/i, ""));
     setUploadMsg(
-      `📄 „${file.name}" geladen (${(file.size / 1000).toFixed(1)} KB) — prüfen und einspeisen.`,
+      `📄 „${file.name}" geladen (${(file.size / 1000).toFixed(1)} KB) — jetzt hochladen.`,
     );
   }
 
@@ -269,22 +304,34 @@ export function Chat({
   }
 
   return (
-    <div className="mx-auto flex h-dvh max-w-6xl flex-col px-4">
+    <div className="mx-auto flex h-dvh w-full max-w-[1500px] flex-col bg-bg text-fg">
       {/* Kopfzeile */}
-      <header className="flex items-center justify-between border-b border-neutral-200 py-4 dark:border-neutral-800">
-        <div>
-          <h1 className="text-xl font-semibold">docsy</h1>
-          <p className="text-xs text-neutral-500">Deine Doku, befragbar mit Quellenangabe.</p>
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-6 lg:px-10">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label={sidebarOpen ? "Menü schließen" : "Menü öffnen"}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-app border border-border text-muted hover:bg-surface-2 hover:text-fg md:hidden"
+          >
+            <IconMenu />
+          </button>
+          <Logo size={30} className="shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold leading-tight tracking-tight">docsy</h1>
+            <p className="hidden text-xs text-muted sm:block">Deine Doku, befragbar mit Quellenangabe.</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="flex items-center gap-2 text-sm text-muted">
             {user.image && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={user.image} alt="" className="h-6 w-6 rounded-full" />
             )}
-            {user.name}
+            {!user.isGuest && (
+              <span className="hidden max-w-[8rem] truncate sm:inline">{user.name}</span>
+            )}
             {user.isGuest && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
                 Gast
               </span>
             )}
@@ -293,7 +340,7 @@ export function Chat({
           <form action={githubSignOut}>
             <button
               type="submit"
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              className="rounded-app border border-border px-3 py-1.5 text-sm text-fg hover:bg-surface-2"
             >
               Abmelden
             </button>
@@ -301,33 +348,61 @@ export function Chat({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden py-4 md:flex-row md:justify-center">
-        {/* Sidebar: Upload + Bibliothek */}
-        <aside className="flex w-full flex-col gap-4 overflow-y-auto md:w-72 md:shrink-0">
+      <div className="relative flex flex-1 overflow-hidden md:px-6 lg:px-10">
+        {/* Scrim — schließt den Drawer auf Mobil */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+            className="absolute inset-0 z-30 bg-black/60 md:hidden"
+          />
+        )}
+
+        {/* Sidebar: auf Mobil ein Off-Canvas-Drawer, ab md fest in der Spalte */}
+        <aside
+          className={
+            "drawer absolute inset-y-0 left-0 z-40 flex w-[85%] max-w-xs flex-col gap-4 overflow-y-auto border-r border-border bg-bg p-4 md:static md:z-auto md:w-72 md:max-w-none " +
+            (sidebarOpen ? "" : "drawer-closed")
+          }
+        >
+          <div className="flex items-center justify-between md:hidden">
+            <span className="text-sm font-semibold">Menü</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Menü schließen"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-app border border-border text-muted hover:bg-surface-2 hover:text-fg"
+            >
+              <IconClose />
+            </button>
+          </div>
           {!user.isGuest && (
-            <section className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+            <section className="rounded-app border border-border bg-surface p-3">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-medium">Verlauf</h2>
+                <h2 className="text-sm font-medium text-fg">Chats</h2>
                 <button
-                  onClick={() => newChat()}
-                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => {
+                    newChat();
+                    setSidebarOpen(false);
+                  }}
+                  className="text-xs font-medium text-accent-strong hover:underline"
                 >
                   + Neuer Chat
                 </button>
               </div>
               {convs.length === 0 ? (
-                <p className="text-xs text-neutral-400">Noch keine Konversationen.</p>
+                <p className="text-xs text-muted">Noch keine Konversationen.</p>
               ) : (
                 <ul className="space-y-0.5 text-sm">
                   {convs.map((c) => (
                     <li key={c.id} className="group flex items-center gap-1">
                       <button
-                        onClick={() => void loadConversation(c.id)}
+                        onClick={() => {
+                          void loadConversation(c.id);
+                          setSidebarOpen(false);
+                        }}
                         className={
-                          "min-w-0 flex-1 truncate rounded px-2 py-1 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 " +
-                          (c.id === conversationId
-                            ? "bg-neutral-100 font-medium dark:bg-neutral-800"
-                            : "")
+                          "min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-fg hover:bg-surface-2 " +
+                          (c.id === conversationId ? "bg-surface-2 font-medium" : "")
                         }
                       >
                         {c.title}
@@ -336,9 +411,9 @@ export function Chat({
                         onClick={() => void deleteConv(c.id)}
                         title="Löschen"
                         aria-label="Konversation löschen"
-                        className="shrink-0 px-1 text-neutral-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-surface-2 hover:text-red-500 group-hover:opacity-100"
                       >
-                        🗑
+                        <IconTrash />
                       </button>
                     </li>
                   ))}
@@ -347,8 +422,8 @@ export function Chat({
             </section>
           )}
           {user.isGuest && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
-              <p className="font-medium">Gastmodus</p>
+            <div className="rounded-app border border-border bg-surface-2 p-3 text-xs text-muted">
+              <p className="font-semibold text-fg">Gastmodus</p>
               <p className="mt-1">
                 Du kannst den Demo-Korpus befragen und bis zu 3 eigene Dokumente
                 testen (max. 50 KB, 20 Fragen/Stunde). Gast-Daten werden nach 24 h
@@ -356,61 +431,46 @@ export function Chat({
               </p>
             </div>
           )}
-          <section className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
-            <h2 className="mb-2 text-sm font-medium">Doku einspeisen</h2>
-            <label className="mb-1 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:border-blue-500 hover:text-blue-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-blue-500">
+          <section className="rounded-app border border-border bg-surface p-3">
+            <h2 className="mb-2 text-sm font-medium text-fg">Doku hochladen</h2>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-app border border-dashed border-border px-3 py-4 text-sm text-muted hover:border-accent hover:text-accent-strong">
               <input
                 type="file"
                 accept=".md,.markdown,text/markdown"
                 className="hidden"
                 onChange={(e) => void handleFile(e)}
               />
-              📄 Markdown-Datei wählen (.md)
+              <IconFile />
+              Markdown-Datei wählen (.md)
             </label>
-            <p className="mb-2 text-center text-xs text-neutral-400">oder Felder manuell ausfüllen</p>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Titel (z.B. React Hooks)"
-              className="mb-2 w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-700"
-            />
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Markdown hier einfügen…"
-              rows={5}
-              className="mb-2 w-full resize-none rounded-lg border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-700"
-            />
             <button
               onClick={() => void upload()}
-              disabled={uploading || !title.trim() || !content.trim()}
-              className="w-full rounded-lg bg-blue-600 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+              disabled={uploading || !content.trim()}
+              className="mt-2 w-full rounded-app bg-accent py-2 text-sm font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-40"
             >
-              {uploading ? "Speise ein…" : "Einspeisen"}
+              {uploading ? "Lade hoch…" : "Hochladen"}
             </button>
-            {uploadMsg && <p className="mt-2 text-xs text-neutral-500">{uploadMsg}</p>}
+            {uploadMsg && <p className="mt-2 text-xs text-muted">{uploadMsg}</p>}
           </section>
 
-          <section className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
-            <h2 className="mb-2 text-sm font-medium">Deine Bibliothek ({docs.length})</h2>
+          <section className="rounded-app border border-border bg-surface p-3">
+            <h2 className="mb-2 text-sm font-medium text-fg">Deine Bibliothek ({docs.length})</h2>
             {docs.length === 0 ? (
-              <p className="text-xs text-neutral-400">
-                Noch nichts Eigenes eingespeist. Füg oben Markdown hinzu.
-              </p>
+              <p className="text-xs text-muted">Noch nichts Eigenes hochgeladen.</p>
             ) : (
-              <ul className="space-y-1 text-sm">
+              <ul className="space-y-0.5 text-sm">
                 {docs.map((d) => (
-                  <li key={d.id} className="group flex items-center justify-between gap-2">
-                    <span className="truncate">{d.title}</span>
+                  <li key={d.id} className="group flex items-center justify-between gap-2 rounded-md px-1 py-0.5">
+                    <span className="truncate text-fg">{d.title}</span>
                     <span className="flex shrink-0 items-center gap-1.5">
-                      <span className="text-xs text-neutral-400">{d.chunkCount}</span>
+                      <span className="text-xs tabular-nums text-muted">{d.chunkCount}</span>
                       <button
                         onClick={() => void deleteDoc(d.id, d.title)}
                         title="Löschen"
                         aria-label={`„${d.title}" löschen`}
-                        className="text-neutral-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-surface-2 hover:text-red-500 group-hover:opacity-100"
                       >
-                        🗑
+                        <IconTrash />
                       </button>
                     </span>
                   </li>
@@ -420,16 +480,16 @@ export function Chat({
           </section>
 
           {defaultDocs.length > 0 && (
-            <section className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
-              <h2 className="mb-1 text-sm font-medium">Standard-Bibliothek</h2>
-              <p className="mb-2 text-xs text-neutral-400">
-                Eingebaute Doku — für alle verfügbar.
+            <section className="rounded-app border border-border bg-surface p-3">
+              <h2 className="mb-1 text-sm font-medium text-fg">Standard-Bibliothek</h2>
+              <p className="mb-2 text-xs text-muted">
+                Integrierte Dokumentationen, für jeden verfügbar.
               </p>
-              <ul className="space-y-1 text-sm">
+              <ul className="space-y-0.5 text-sm">
                 {defaultDocs.map((d) => (
-                  <li key={d.id} className="flex justify-between gap-2">
-                    <span className="truncate">{d.title}</span>
-                    <span className="shrink-0 text-xs text-neutral-400">{d.chunkCount}</span>
+                  <li key={d.id} className="flex justify-between gap-2 px-1">
+                    <span className="truncate text-fg">{d.title}</span>
+                    <span className="shrink-0 text-xs tabular-nums text-muted">{d.chunkCount}</span>
                   </li>
                 ))}
               </ul>
@@ -437,16 +497,17 @@ export function Chat({
           )}
         </aside>
 
-        {/* Chat — feste, komfortable Breite auf großen Screens; voll auf Mobil. */}
-        <main className="flex flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 md:w-[720px] md:flex-none dark:border-neutral-800">
-          <div className="flex-1 space-y-6 overflow-y-auto p-4">
-            {messages.length === 0 && (
-              <div className="mt-16 text-center text-neutral-400">
-                {docs.length === 0
-                  ? "Frag die eingebaute Standard-Doku (JavaScript, TypeScript, …) — oder speise links eigene Doku ein."
-                  : "Stell eine Frage zu deiner oder der Standard-Doku."}
-              </div>
-            )}
+        {/* Chat — fluide Spalte; Inhalt auf angenehme Lesebreite begrenzt. */}
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-5">
+              {messages.length === 0 && (
+                <div className="mt-16 text-center text-muted">
+                  {docs.length === 0
+                    ? "Frag die integrierten Dokumentationen oder lade über das Menü deine eigenen hoch."
+                    : "Stell eine Frage zu deiner oder der Standard-Doku."}
+                </div>
+              )}
             {messages.map((msg, i) => {
               const isLast = i === messages.length - 1;
               const waiting = msg.role === "assistant" && msg.content === "" && busy && isLast;
@@ -454,42 +515,42 @@ export function Chat({
                 <div key={i} className={msg.role === "user" ? "text-right" : "text-left"}>
                   <div
                     className={
-                      "inline-block max-w-[90%] rounded-2xl px-4 py-2 text-left " +
+                      "inline-block max-w-[90%] px-4 py-2.5 text-left " +
                       (msg.role === "user"
-                        ? "whitespace-pre-wrap bg-blue-600 text-white"
-                        : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
+                        ? "whitespace-pre-wrap rounded-app rounded-br bg-user text-user-fg"
+                        : "rounded-app rounded-bl border border-border bg-surface text-fg")
                     }
                   >
                     {msg.role === "user" ? (
                       msg.content
                     ) : waiting ? (
                       <span className="flex gap-1 py-1" aria-label="Antwort wird generiert">
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.3s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.15s]" />
-                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" />
                       </span>
                     ) : (
                       <MarkdownMessage content={msg.content} msgId={`msg-${i}`} />
                     )}
                   </div>
                   {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-2 space-y-1 text-left text-xs text-neutral-500">
-                      <div className="font-medium">Quellen:</div>
+                    <div className="mt-2 space-y-1 text-left text-xs text-muted">
+                      <div className="font-medium text-fg">Quellen</div>
                       {msg.sources.map((s) => (
                         <details
                           key={s.index}
                           id={`msg-${i}-src-${s.index}`}
-                          className="group rounded px-1 transition-shadow"
+                          className="group rounded-md px-1 transition-shadow"
                         >
                           <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
-                            <span className="select-none text-neutral-400 transition-transform group-open:rotate-90">
+                            <span className="select-none text-muted transition-transform group-open:rotate-90">
                               ▸
                             </span>
                             <span>
                               [{s.index}] {s.sourcePath}
                               {s.heading ? ` — ${s.heading}` : ""}{" "}
                               <span
-                                className="text-neutral-400"
+                                className="text-muted/80"
                                 title="Semantische Ähnlichkeit von Frage und Textstelle — kein Konfidenz- oder Korrektheitswert."
                               >
                                 · Ähnlichkeit {(s.similarity * 100).toFixed(0)}%
@@ -497,11 +558,11 @@ export function Chat({
                             </span>
                           </summary>
                           {s.content ? (
-                            <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded-md bg-neutral-100 p-2 font-mono text-[11px] leading-relaxed text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+                            <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-2 p-2 font-mono text-[11px] leading-relaxed text-muted">
                               {s.content}
                             </pre>
                           ) : (
-                            <p className="mt-1 pl-4 italic text-neutral-400">
+                            <p className="mt-1 pl-4 italic text-muted">
                               (Kein Auszug gespeichert — ältere Konversation.)
                             </p>
                           )}
@@ -512,7 +573,7 @@ export function Chat({
                   {msg.role === "assistant" && isLast && !busy && msg.content !== "" && (
                     <button
                       onClick={() => void regenerate()}
-                      className="mt-2 flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
+                      className="mt-2 flex items-center gap-1 text-xs text-muted hover:text-fg"
                     >
                       <svg
                         width="13"
@@ -534,26 +595,29 @@ export function Chat({
                 </div>
               );
             })}
-            <div ref={bottomRef} />
+              <div ref={bottomRef} />
+            </div>
           </div>
 
-          <div className="border-t border-neutral-200 p-3 dark:border-neutral-800">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                rows={1}
-                placeholder="Frage eingeben… (Enter zum Senden)"
-                className="flex-1 resize-none rounded-xl border border-neutral-300 bg-transparent px-4 py-2 outline-none focus:border-blue-500 dark:border-neutral-700"
-              />
-              <button
-                onClick={() => void send()}
-                disabled={busy || input.trim() === ""}
-                className="rounded-xl bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-40"
-              >
-                {busy ? "…" : "Senden"}
-              </button>
+          <div className="border-t border-border">
+            <div className="mx-auto w-full max-w-3xl p-3">
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  rows={1}
+                  placeholder="Frage eingeben…"
+                  className="max-h-40 flex-1 resize-none rounded-app border border-border bg-surface px-4 py-2.5 text-fg outline-none placeholder:text-muted focus:border-accent focus:ring-1 focus:ring-ring"
+                />
+                <button
+                  onClick={() => void send()}
+                  disabled={busy || input.trim() === ""}
+                  className="rounded-app bg-accent px-4 py-2.5 font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-40"
+                >
+                  {busy ? "…" : "Senden"}
+                </button>
+              </div>
             </div>
           </div>
         </main>

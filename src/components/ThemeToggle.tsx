@@ -43,7 +43,7 @@ export function ThemeToggle() {
       onClick={toggle}
       title="Hell/Dunkel umschalten"
       aria-label={dark ? "Zu hellem Modus wechseln" : "Zu dunklem Modus wechseln"}
-      className="flex items-center justify-center rounded-lg border border-neutral-300 p-2 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+      className="flex h-9 w-9 items-center justify-center rounded-app border border-border text-muted hover:bg-surface-2 hover:text-fg"
     >
       {/* Flache Stroke-Icons (currentColor). Kann zwischen SSR und Client kurz
           abweichen -> Hydration-Warnung am Wrapper unterdrücken. */}

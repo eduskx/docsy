@@ -64,7 +64,7 @@ function CodeBlock({ children }: { children?: React.ReactNode }) {
           </svg>
         )}
       </button>
-      <pre ref={preRef} className="overflow-x-auto rounded-lg bg-neutral-900 p-3 pr-12 text-sm">
+      <pre ref={preRef} className="overflow-x-auto rounded-lg bg-code p-3 pr-12 text-sm">
         {children}
       </pre>
     </div>
@@ -96,10 +96,10 @@ function linkifyCitations(text: string, msgId: string) {
           // Ist die Quelle ein <details>, gleich aufklappen (zeigt den Chunk-Text).
           if (el instanceof HTMLDetailsElement) el.open = true;
           el?.scrollIntoView({ behavior: "smooth", block: "center" });
-          el?.classList.add("ring-2", "ring-blue-400");
-          setTimeout(() => el?.classList.remove("ring-2", "ring-blue-400"), 1200);
+          el?.classList.add("ring-2", "ring-accent");
+          setTimeout(() => el?.classList.remove("ring-2", "ring-accent"), 1200);
         }}
-        className="mx-0.5 rounded bg-blue-100 px-1 text-xs font-medium text-blue-700 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60"
+        className="mx-0.5 rounded bg-accent/15 px-1 text-xs font-medium text-accent-strong hover:bg-accent/25"
       >
         [Quelle {n}]
       </button>
