@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --test \"src/**/*.test.ts\"",
     "db:migrate": "node --env-file=.env scripts/migrate.ts",
     "db:ping": "node --env-file=.env scripts/ping.ts",
     "chunk:try": "node scripts/try-chunk.ts",
