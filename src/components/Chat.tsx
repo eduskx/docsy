@@ -301,7 +301,7 @@ export function Chat({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden py-4 md:flex-row">
+      <div className="flex flex-1 flex-col gap-4 overflow-hidden py-4 md:flex-row md:justify-center">
         {/* Sidebar: Upload + Bibliothek */}
         <aside className="flex w-full flex-col gap-4 overflow-y-auto md:w-72 md:shrink-0">
           {!user.isGuest && (
@@ -437,8 +437,8 @@ export function Chat({
           )}
         </aside>
 
-        {/* Chat */}
-        <main className="flex flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+        {/* Chat — feste, komfortable Breite auf großen Screens; voll auf Mobil. */}
+        <main className="flex flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 md:w-[720px] md:flex-none dark:border-neutral-800">
           <div className="flex-1 space-y-6 overflow-y-auto p-4">
             {messages.length === 0 && (
               <div className="mt-16 text-center text-neutral-400">
@@ -488,8 +488,11 @@ export function Chat({
                             <span>
                               [{s.index}] {s.sourcePath}
                               {s.heading ? ` — ${s.heading}` : ""}{" "}
-                              <span className="text-neutral-400">
-                                ({(s.similarity * 100).toFixed(0)}%)
+                              <span
+                                className="text-neutral-400"
+                                title="Semantische Ähnlichkeit von Frage und Textstelle — kein Konfidenz- oder Korrektheitswert."
+                              >
+                                · Ähnlichkeit {(s.similarity * 100).toFixed(0)}%
                               </span>
                             </span>
                           </summary>

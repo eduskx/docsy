@@ -20,6 +20,8 @@ export const runtime = "nodejs";
  * und Chunking bleiben unverändert.
  */
 const CHAT_MODEL = "llama-3.3-70b-versatile";
+/** Kleines, schnelles Modell für die zusammenfassende Verlaufs-Überschrift. */
+const TITLE_MODEL = "llama-3.1-8b-instant";
 const TOP_K = 5;
 
 /** Baut den System-Prompt: Antworte NUR aus den Doku-Ausschnitten, mit Quellen. */
@@ -81,6 +83,7 @@ export async function POST(req: Request) {
   // Bestehende Konversation fortführen oder neue anlegen; User-Nachricht speichern.
   let conversationId: number | null = null;
   let conversationTitle: string | null = null;
+  let createdNewConversation = false;
   if (!guest) {
     const provided = Number(body.conversationId);
     if (Number.isInteger(provided) && provided > 0) {
@@ -93,12 +96,15 @@ export async function POST(req: Request) {
       }
     }
     if (conversationId === null) {
+      // Vorläufiger Titel (Anfang der Frage) — wird nach der Antwort durch eine
+      // zusammenfassende Überschrift ersetzt (siehe generateTitle im Stream).
       conversationTitle = message.slice(0, 60);
       const [c] = await sql<{ id: number }[]>`
         INSERT INTO conversations (user_id, title) VALUES (${userId}, ${conversationTitle})
         RETURNING id
       `;
       conversationId = Number(c.id);
+      createdNewConversation = true;
     }
     if (regenerate && conversationId !== null) {
       // Regenerate: die letzte Assistant-Antwort entfernen (wird neu erzeugt) —
@@ -154,6 +160,37 @@ export async function POST(req: Request) {
         }
       };
 
+      // Nach der Antwort: für neue Konversationen eine zusammenfassende
+      // Überschrift aus der ersten Frage erzeugen (statt der Frage im Wortlaut).
+      // Läuft NACH dem Streamen -> keine zusätzliche Latenz für die Antwort.
+      const maybeUpdateTitle = async () => {
+        if (!createdNewConversation || conversationId === null) return;
+        try {
+          const t = await groq.chat.completions.create({
+            model: TITLE_MODEL,
+            max_tokens: 24,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Formuliere eine kurze, prägnante Überschrift (höchstens 6 Wörter) für eine Chat-Konversation anhand der ersten Frage des Nutzers. Antworte NUR mit der Überschrift — ohne Anführungszeichen, ohne Satzzeichen am Ende.",
+              },
+              { role: "user", content: message },
+            ],
+          });
+          const title = t.choices[0]?.message?.content
+            ?.trim()
+            .replace(/^["']|["']$/g, "")
+            .slice(0, 80);
+          if (title) {
+            await sql`UPDATE conversations SET title = ${title} WHERE id = ${conversationId}`;
+            send({ type: "conversation", id: conversationId, title });
+          }
+        } catch {
+          // Titel-Generierung ist optional — bei Fehler bleibt der vorläufige Titel.
+        }
+      };
+
       try {
         // Konversation zuerst, damit der Client die ID kennt (Verlauf).
         if (conversationId !== null) {
@@ -168,6 +205,7 @@ export async function POST(req: Request) {
             "In deiner Bibliothek finde ich dazu nichts. Speise ein Dokument ein, das dein Thema abdeckt.";
           send({ type: "text", text: msg });
           await persistAssistant(msg);
+          await maybeUpdateTitle();
           send({ type: "done" });
           return;
         }
@@ -192,6 +230,7 @@ export async function POST(req: Request) {
         }
 
         await persistAssistant(assistantText);
+        await maybeUpdateTitle();
         send({ type: "done" });
       } catch (err) {
         send({

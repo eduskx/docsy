@@ -27,11 +27,44 @@ function CodeBlock({ children }: { children?: React.ReactNode }) {
       <button
         type="button"
         onClick={copy}
-        className="absolute right-2 top-2 rounded border border-white/15 bg-white/10 px-2 py-0.5 text-xs text-neutral-200 opacity-0 transition-opacity hover:bg-white/20 group-hover/code:opacity-100"
+        title={copied ? "Kopiert" : "Code kopieren"}
+        aria-label={copied ? "Kopiert" : "Code kopieren"}
+        className="absolute right-3 top-3 rounded-md bg-white/10 p-1.5 text-neutral-300 opacity-0 transition hover:bg-white/20 hover:text-white group-hover/code:opacity-100"
       >
-        {copied ? "Kopiert ✓" : "Kopieren"}
+        {copied ? (
+          // Häkchen
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        ) : (
+          // Klemmbrett/Kopieren
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        )}
       </button>
-      <pre ref={preRef} className="overflow-x-auto rounded-lg bg-neutral-900 p-3 text-sm">
+      <pre ref={preRef} className="overflow-x-auto rounded-lg bg-neutral-900 p-3 pr-12 text-sm">
         {children}
       </pre>
     </div>
