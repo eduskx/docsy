@@ -12,7 +12,6 @@
     "db:ping": "node --env-file=.env scripts/ping.ts",
     "chunk:try": "node scripts/try-chunk.ts",
     "embed:try": "node --env-file=.env scripts/try-embed.ts",
-    "ingest": "node --env-file=.env scripts/ingest.ts",
     "ingest:mdn": "node --env-file=.env scripts/ingest-mdn.ts",
     "search:try": "node --env-file=.env scripts/try-search.ts",
     "eval": "node --env-file=.env scripts/evaluate.ts",

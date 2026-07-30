@@ -5,13 +5,17 @@
  * Lädt das Test-Dokument, ruft deine chunk()-Funktion auf und zeigt dir
  * jeden Chunk plus ein paar Statistiken zum Tunen der Zielgröße.
  *
- * Optional anderes Dokument:  npm run chunk:try -- docs/pfad/zur/datei.md
+ * Dokument angeben:  npm run chunk:try -- pfad/zur/datei.md
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chunk, type Chunk } from "../src/lib/ingest/chunk.ts";
 
-const relPath = process.argv[2] ?? "docs/javascript/async-await.md";
+const relPath = process.argv[2];
+if (!relPath) {
+  console.error("Nutzung: npm run chunk:try -- pfad/zur/datei.md");
+  process.exit(1);
+}
 const filePath = join(process.cwd(), relPath);
 
 let markdown: string;

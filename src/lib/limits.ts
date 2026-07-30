@@ -18,7 +18,7 @@ export const GUEST = {
 /**
  * Der Standard-/Default-Korpus (eingebaute Doku, z.B. JavaScript). Wird von
  * ALLEN Nutzern zusätzlich zu ihren eigenen Uploads durchsucht — Gäste wie
- * angemeldete User. Gespeichert unter user_id = "seed" (via `npm run ingest`).
+ * angemeldete User. Gespeichert unter user_id = "seed" (via `npm run ingest:mdn`).
  */
 export const DEFAULT_USER_ID = "seed";
 
