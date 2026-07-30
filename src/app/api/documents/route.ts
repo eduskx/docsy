@@ -22,6 +22,7 @@ export async function GET() {
   const cols = sql`
     d.id,
     d.title,
+    d.source,
     d.source_path    AS "sourcePath",
     count(c.id)::int AS "chunkCount"
   `;

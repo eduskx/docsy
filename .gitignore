@@ -40,6 +40,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# MDN-Standardkorpus (CC-BY-SA, lokal gehalten; via ingest-mdn.ts eingespeist)
+/mdn
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -24,6 +24,7 @@ befragt werden — mit **Quellenangabe**, welche Doku-Stelle die Antwort stützt
 Streaming.
 
 **Umfang:**
+
 - Ingestion: Markdown-Dokus laden, chunken, Embeddings speichern
 - Retrieval + Chat-Interface mit Streaming und Quellenanzeige
 - Auth + eigene Bibliothek pro User (welche Docs eingespeist), Verlauf
@@ -43,6 +44,7 @@ Es gibt zwei Sorten Code in diesem Projekt, und du behandelst sie
 **unterschiedlich**:
 
 ### A) Generieren — zügig, ohne Rückfragen
+
 Setup, Boilerplate, Routing-Gerüst, UI-Komponenten nach klarem Muster, Styling,
 Konfiguration, CRUD-Standardkram, Auth-Anbindung.
 
@@ -50,6 +52,7 @@ Hier lerne ich nichts. Bau das schnell und ohne mich zu unterbrechen. Kurz
 sagen was du gemacht hast, fertig. Keine Kontrollfragen, keine Mini-Lektionen.
 
 ### B) Ich schreibe selbst — du bist Sparringspartner, nicht Generator
+
 Diese vier Stellen sind der Kern und werden im Interview abgefragt:
 
 1. **Chunking** — wie ich die Doku zerlege und warum diese Größe
@@ -66,6 +69,7 @@ mich einmal darauf hin**, dass das die Interview-relevanten Stellen sind. Wenn
 ich dann trotzdem darauf bestehe, mach es — es ist meine Entscheidung.
 
 ### Was ich sonst von dir erwarte
+
 - **Ehrlichkeit vor Gefälligkeit.** Wenn ich einen Denkfehler habe oder ein
   schlechter Ansatz droht: direkt sagen, begründen, nichts beschönigen.
 - **Scope-Wache.** Ich neige dazu, endlos zu optimieren statt fertig zu werden.
@@ -76,23 +80,13 @@ ich dann trotzdem darauf bestehe, mach es — es ist meine Entscheidung.
 - **Keine stillen Installationen.** Neues Paket oder Config-Änderung: kurz sagen
   was und warum.
 
-## 4. Tagesplan
+## 4. Bei Fehlern
 
-- **Tag 1-2:** Setup, DB + pgvector, Ingestion-Pipeline. Chunking = ich (B).
-- **Tag 3-4:** Retrieval + Chat-UI mit Streaming und Quellenanzeige.
-  Vektorsuche = ich (B), UI = du (A).
-- **Tag 5-6:** Evaluation-Framework. Testfragen und Auswertung = ich (B).
-- **Tag 7-8:** Deploy, README mit Design-Entscheidungen, Puffer.
-
-Wenn die Zeit knapp wird: **Auth und Verlauf sind die ersten Kandidaten zum
-Streichen** — nicht die Evaluation.
-
-## 5. Bei Fehlern
 Erst die Fehlermeldung gemeinsam lesen und verstehen, dann fixen. Kurz sagen was
 die Ursache war, damit ich sowas künftig selbst erkenne. Keine Vorlesung.
 
 ---
 
-*Kurzfassung: Boilerplate schnell und ohne Rückfragen. Die vier Kernstellen
+_Kurzfassung: Boilerplate schnell und ohne Rückfragen. Die vier Kernstellen
 schreibe ich selbst, du korrigierst. Halte den Scope eng, sag mir ehrlich wenn
-ich falsch liege, und erinnere mich ans Fertigwerden.*
+ich falsch liege, und erinnere mich ans Fertigwerden._

@@ -45,6 +45,14 @@ export async function search(
   const queryVector = await embedOne(query, "query");
   const literal = `[${queryVector.join(",")}]`;
 
+  // Lexikalische tsquery ('english', passend zum englischen Korpus) mit
+  // ODER-Semantik: plainto_tsquery UND-verknüpft alle Terme — deutsche
+  // Füllwörter der Frage ("wozu", "dient") sind in keiner Stoppwortliste und
+  // würden als Pflicht-Terme JEDEN Treffer gegen den englischen Text abwürgen.
+  // Trick: plainto (UND) -> Text -> "&" durch "|" ersetzen -> to_tsquery (ODER).
+  // So zieht ein einzelner Fachbegriff-Anker ("reviver", "z-index") den Chunk hoch.
+  const tsq = sql`to_tsquery('english', replace(plainto_tsquery('english', ${query})::text, '&', '|'))`;
+
   // Multi-User-Trennung: in der Vektor-CTE als erstes WHERE, in der FTS-CTE als
   // zusätzliches AND (dort steht schon ein WHERE für den tsquery-Match).
   const userWhere =
@@ -65,14 +73,17 @@ export async function search(
       LIMIT ${CANDIDATES}
     ),
     -- (2) Lexikalisches Ranking: Volltext-Treffer nach ts_rank.
+    -- to_tsvector(...) statt einer STORED-Spalte: die Ausdrucks-Form wird vom
+    -- GIN-Expression-Index chunks_content_tsv_idx bedient und spart die 17 MB
+    -- der materialisierten Spalte (relevant beim knappen Neon-Speicher).
     fts_ranked AS (
       SELECT c.id,
              row_number() OVER (
-               ORDER BY ts_rank(c.content_tsv, plainto_tsquery('german', ${query})) DESC
+               ORDER BY ts_rank(to_tsvector('english', c.content), ${tsq}) DESC
              ) AS rank
       FROM chunks c
       JOIN documents d ON d.id = c.document_id
-      WHERE c.content_tsv @@ plainto_tsquery('german', ${query})
+      WHERE to_tsvector('english', c.content) @@ ${tsq}
       ${userAnd}
       LIMIT ${CANDIDATES}
     ),

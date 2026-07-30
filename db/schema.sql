@@ -40,13 +40,22 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw
 
 CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks(document_id);
 
--- Volltext-Suche (für die hybride Suche): generierte tsvector-Spalte + GIN-Index.
--- 'german'-Config: Stemming für die deutschen Doku-Texte.
-ALTER TABLE chunks
-  ADD COLUMN IF NOT EXISTS content_tsv tsvector
-  GENERATED ALWAYS AS (to_tsvector('german', content)) STORED;
+-- Volltext-Suche (für die hybride Suche): GIN-EXPRESSION-Index statt einer
+-- materialisierten tsvector-Spalte. Zwei Gründe:
+--   1. 'english'-Config — der Korpus (MDN) ist ENGLISCH; Stemming muss zur
+--      Sprache des INHALTS passen, nicht zur Sprache der Fragen. Die deutschen
+--      Fragen tragen ihre Retrieval-Signale über die englischen Fachbegriffe;
+--      die Query-Seite (search.ts) baut eine ODER-tsquery, damit deutsche
+--      Füllwörter keine Treffer abwürgen.
+--   2. Ein Expression-Index spart die ~17 MB der doppelt gespeicherten
+--      tsvector-Spalte — relevant, weil die DB (HNSW-Index!) nah am Neon-Limit
+--      liegt. search.ts fragt exakt `to_tsvector('english', content)` ab, damit
+--      der Planner diesen Index nutzt.
+-- Eine evtl. alte STORED-Spalte aus früheren Migrationen wird entfernt.
+ALTER TABLE chunks DROP COLUMN IF EXISTS content_tsv;
 
-CREATE INDEX IF NOT EXISTS chunks_content_tsv_idx ON chunks USING GIN (content_tsv);
+CREATE INDEX IF NOT EXISTS chunks_content_tsv_idx
+  ON chunks USING GIN (to_tsvector('english', content));
 
 -- Verlauf: eine Konversation pro Chat-Sitzung, gehört einem User.
 CREATE TABLE IF NOT EXISTS conversations (
