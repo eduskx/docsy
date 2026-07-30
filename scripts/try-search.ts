@@ -22,7 +22,7 @@ try {
   const results = await search(sql, query, 5, ["seed"]);
 
   if (results.length === 0) {
-    console.log("Keine Treffer — ist schon etwas per `npm run ingest` eingespeist?");
+    console.log("Keine Treffer. Ist schon etwas per `npm run ingest:mdn` eingespeist?");
   }
 
   results.forEach((r, i) => {
