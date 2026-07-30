@@ -1,6 +1,7 @@
 import postgres from "postgres";
 import { chunk } from "./chunk.ts";
 import { embed, EMBEDDING_DIMENSIONS } from "../embed.ts";
+import { DocLimitError } from "../limits.ts";
 
 /**
  * Wiederverwendbare Ingestion für EIN Dokument: Markdown -> Chunks ->
@@ -22,7 +23,20 @@ export type IngestInput = {
   markdown: string;
 };
 
-export async function ingestDocument(sql: Db, input: IngestInput): Promise<number> {
+export type IngestOptions = {
+  /**
+   * Wenn gesetzt: max. Dokumente pro User. Wird ATOMAR in der Transaktion
+   * geprüft (nach dem Idempotenz-DELETE, unter Advisory-Lock) — race-fest gegen
+   * gleichzeitige Uploads. Wirft DocLimitError, wenn das Limit erreicht ist.
+   */
+  maxDocuments?: number;
+};
+
+export async function ingestDocument(
+  sql: Db,
+  input: IngestInput,
+  options?: IngestOptions,
+): Promise<number> {
   const chunks = chunk(input.markdown);
   if (chunks.length === 0) return 0;
 
@@ -42,10 +56,23 @@ export async function ingestDocument(sql: Db, input: IngestInput): Promise<numbe
   }
 
   await sql.begin(async (tx) => {
+    // Gleichzeitige Uploads DESSELBEN Users serialisieren, damit die
+    // Limit-Prüfung unten race-fest ist (Key 2 = Upload-Domain, vgl. Chat-Quota).
+    if (options?.maxDocuments != null) {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${input.userId}), 2)`;
+    }
+    // Idempotenz: ein vorhandenes Dokument mit gleichem source_path zuerst weg.
+    // WICHTIG vor der Zählung — ein Re-Upload ERSETZT und zählt nicht doppelt.
     await tx`
       DELETE FROM documents
       WHERE user_id = ${input.userId} AND source_path = ${input.sourcePath}
     `;
+    if (options?.maxDocuments != null) {
+      const [{ n }] = await tx<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM documents WHERE user_id = ${input.userId}
+      `;
+      if (n >= options.maxDocuments) throw new DocLimitError(options.maxDocuments);
+    }
     const [doc] = await tx`
       INSERT INTO documents (user_id, title, source, source_path)
       VALUES (${input.userId}, ${input.title}, ${input.source}, ${input.sourcePath})

@@ -3,10 +3,11 @@ import { sql } from "@/lib/db";
 import { ingestDocument } from "@/lib/ingest/pipeline";
 import {
   GUEST,
+  MAX_DOC_BYTES,
   DEFAULT_USER_ID,
+  DocLimitError,
   isGuest,
   cleanupExpiredGuests,
-  countDocuments,
   logUsage,
 } from "@/lib/limits";
 
@@ -78,34 +79,31 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id;
+  const guest = isGuest(userId);
 
-  // Gast-Kappen: Aufräumen, Größe und Anzahl prüfen.
-  if (isGuest(userId)) {
-    await cleanupExpiredGuests(sql);
-    if (Buffer.byteLength(content, "utf8") > GUEST.maxDocBytes) {
-      return Response.json(
-        { error: `Gast-Limit: max. ${GUEST.maxDocBytes / 1000} KB pro Dokument. Melde dich an für größere Uploads.` },
-        { status: 413 },
-      );
-    }
-    const count = await countDocuments(sql, userId);
-    if (count >= GUEST.maxDocs) {
-      return Response.json(
-        { error: `Gast-Limit erreicht (max. ${GUEST.maxDocs} Dokumente). Melde dich an, um mehr einzuspeisen.` },
-        { status: 403 },
-      );
-    }
+  // Größenlimit gilt für ALLE (Kosten/Speicher). Die Dokument-Anzahl wird für
+  // Gäste atomar in der Ingestion geprüft (race-fest, siehe ingestDocument).
+  if (Buffer.byteLength(content, "utf8") > MAX_DOC_BYTES) {
+    return Response.json(
+      { error: `Dokument zu groß (max. ${MAX_DOC_BYTES / 1000} KB pro Dokument).` },
+      { status: 413 },
+    );
   }
+  if (guest) await cleanupExpiredGuests(sql);
 
   try {
-    const chunks = await ingestDocument(sql, {
-      userId,
-      source: "upload",
-      sourcePath: title, // pro User eindeutig -> Re-Upload gleichen Titels ersetzt
-      title,
-      markdown: content,
-    });
-    if (isGuest(userId)) await logUsage(sql, userId, "upload");
+    const chunks = await ingestDocument(
+      sql,
+      {
+        userId,
+        source: "upload",
+        sourcePath: title, // pro User eindeutig -> Re-Upload gleichen Titels ersetzt
+        title,
+        markdown: content,
+      },
+      guest ? { maxDocuments: GUEST.maxDocs } : undefined,
+    );
+    if (guest) await logUsage(sql, userId, "upload");
     if (chunks === 0) {
       return Response.json(
         { error: "Kein Inhalt zum Einspeisen gefunden (keine Chunks)." },
@@ -114,9 +112,15 @@ export async function POST(req: Request) {
     }
     return Response.json({ ok: true, chunks });
   } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
+    if (err instanceof DocLimitError) {
+      return Response.json(
+        { error: `${err.message} Melde dich an, um mehr einzuspeisen.` },
+        { status: 403 },
+      );
+    }
+    // Interne Fehler serverseitig loggen, dem Client nur eine generische Meldung
+    // zeigen (keine DB-/Upstream-Details nach außen tragen).
+    console.error("Upload fehlgeschlagen:", err);
+    return Response.json({ error: "Einspeisen fehlgeschlagen." }, { status: 500 });
   }
 }

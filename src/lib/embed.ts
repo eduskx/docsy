@@ -88,7 +88,7 @@ export async function embed(
       const retryAfter = Number(response.headers.get("retry-after"));
       const waitMs =
         Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
+          ? Math.min(retryAfter * 1000, 30_000) // Upstream-Wert deckeln (max. 30s)
           : Math.min(1000 * 2 ** attempt, 30_000); // 1s,2s,4s,8s,16s,30s
       await new Promise((r) => setTimeout(r, waitMs));
       continue;
