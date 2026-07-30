@@ -451,7 +451,9 @@ export function Chat({
             </div>
           )}
           <section className="rounded-app border border-border bg-surface p-3">
-            <h2 className="mb-2 text-sm font-medium text-fg">Doku hochladen</h2>
+            <h2 className="mb-2 text-sm font-medium text-fg">
+              Doku hochladen <span className="font-normal text-muted">(max. 50 KB)</span>
+            </h2>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-app border border-dashed border-border px-3 py-4 text-sm text-muted hover:border-accent hover:text-accent-strong">
               <input
                 type="file"

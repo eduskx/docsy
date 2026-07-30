@@ -7,8 +7,7 @@ import {
   DEFAULT_USER_ID,
   isGuest,
   cleanupExpiredGuests,
-  countRecentChats,
-  logUsage,
+  tryConsumeChatQuota,
 } from "@/lib/limits";
 
 // postgres.js braucht die Node-Runtime (nicht Edge).
@@ -66,17 +65,17 @@ export async function POST(req: Request) {
   const userId = session.user.id;
   const guest = isGuest(userId);
 
-  // Gäste: aufräumen, Rate-Limit prüfen, protokollieren.
+  // Gäste: aufräumen, dann Rate-Limit prüfen UND protokollieren in einem
+  // atomaren Schritt (race-fest — verhindert Umgehung durch parallele Requests).
   if (guest) {
     await cleanupExpiredGuests(sql);
-    const recent = await countRecentChats(sql, userId);
-    if (recent >= GUEST.chatPerHour) {
+    const allowed = await tryConsumeChatQuota(sql, userId, GUEST.chatPerHour);
+    if (!allowed) {
       return Response.json(
         { error: `Gast-Limit erreicht (${GUEST.chatPerHour} Fragen/Stunde). Melde dich an für unbegrenzten Zugriff.` },
         { status: 429 },
       );
     }
-    await logUsage(sql, userId, "chat");
   }
 
   // Verlauf: nur für angemeldete GitHub-User persistieren.
@@ -233,9 +232,12 @@ export async function POST(req: Request) {
         await maybeUpdateTitle();
         send({ type: "done" });
       } catch (err) {
+        // Interne Details bleiben im Server-Log; der Client bekommt nur eine
+        // generische Meldung (keine DB-/Upstream-Fehler nach außen tragen).
+        console.error("Chat-Stream-Fehler:", err);
         send({
           type: "error",
-          error: err instanceof Error ? err.message : String(err),
+          error: "Bei der Antwort ist ein Fehler aufgetreten. Bitte versuch es erneut.",
         });
       } finally {
         controller.close();
