@@ -54,9 +54,28 @@ type Message = {
 type Doc = {
   id: number;
   title: string;
+  source: string;
   sourcePath: string;
   chunkCount: number;
 };
+
+/** Anzeigename je Sprach-Quelle der Standard-Bibliothek. */
+const SOURCE_LABELS: Record<string, string> = {
+  css: "CSS",
+  html: "HTML",
+  javascript: "JavaScript",
+};
+
+/**
+ * Baut aus einem MDN-slug (source_path der Seed-Docs, z.B.
+ * "Web/CSS/Reference/Properties/color") den Deep-Link zur MDN-Seite.
+ * Für eigene Uploads (kein "Web/"-Präfix) gibt es keinen Link -> null.
+ */
+function mdnUrl(sourcePath: string): string | null {
+  return sourcePath.startsWith("Web/")
+    ? `https://developer.mozilla.org/en-US/docs/${sourcePath}`
+    : null;
+}
 
 type Conversation = {
   id: number;
@@ -485,14 +504,42 @@ export function Chat({
               <p className="mb-2 text-xs text-muted">
                 Integrierte Dokumentationen, für jeden verfügbar.
               </p>
-              <ul className="space-y-0.5 text-sm">
-                {defaultDocs.map((d) => (
-                  <li key={d.id} className="flex justify-between gap-2 px-1">
-                    <span className="truncate text-fg">{d.title}</span>
-                    <span className="shrink-0 text-xs tabular-nums text-muted">{d.chunkCount}</span>
-                  </li>
-                ))}
-              </ul>
+              {/* Nach Sprache gruppiert & eingeklappt — bei tausenden MDN-Seiten
+                  wäre eine flache Liste unbrauchbar. */}
+              <div className="space-y-1">
+                {Object.entries(
+                  defaultDocs.reduce<Record<string, Doc[]>>((groups, d) => {
+                    (groups[d.source] ??= []).push(d);
+                    return groups;
+                  }, {}),
+                )
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([source, group]) => (
+                    <details key={source} className="group rounded-md">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-md px-1 py-0.5 text-sm hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+                        <span className="flex items-center gap-1 text-fg">
+                          <span className="select-none text-muted transition-transform group-open:rotate-90">
+                            ▸
+                          </span>
+                          {SOURCE_LABELS[source] ?? source}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted">
+                          {group.length} Seiten
+                        </span>
+                      </summary>
+                      <ul className="mt-0.5 max-h-64 space-y-0.5 overflow-y-auto pl-5 text-sm">
+                        {group.map((d) => (
+                          <li key={d.id} className="flex justify-between gap-2 px-1">
+                            <span className="truncate text-fg">{d.title}</span>
+                            <span className="shrink-0 text-xs tabular-nums text-muted">
+                              {d.chunkCount}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ))}
+              </div>
             </section>
           )}
         </aside>
@@ -547,7 +594,20 @@ export function Chat({
                               ▸
                             </span>
                             <span>
-                              [{s.index}] {s.sourcePath}
+                              [{s.index}]{" "}
+                              {mdnUrl(s.sourcePath) ? (
+                                <a
+                                  href={mdnUrl(s.sourcePath)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-fg underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                                >
+                                  {s.sourcePath}
+                                </a>
+                              ) : (
+                                s.sourcePath
+                              )}
                               {s.heading ? ` — ${s.heading}` : ""}{" "}
                               <span
                                 className="text-muted/80"
